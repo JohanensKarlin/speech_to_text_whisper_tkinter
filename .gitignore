@@ -1,0 +1,39 @@
+# Build-Verzeichnisse
+build/
+dist/
+
+# PyInstaller-Dateien
+*.spec
+
+# Python-Cache-Dateien
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtuelle Umgebungen
+venv/
+env/
+ENV/
+
+# IDE-spezifische Dateien
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Betriebssystem-Dateien
+.DS_Store
+Thumbs.db
+
+# Temporäre Dateien
+*.tmp
+*.bak
+*.log
+
+# Umgebungsvariablen
+.env
+venv
+# Konfigurationsdatei
+config.json
