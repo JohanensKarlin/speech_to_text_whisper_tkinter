@@ -388,12 +388,55 @@ def transcribe_audio(audio_file):
         # Stoppe die Animation
         stop_wave_animation()
         
-        # Füge den transkribierten Text ein
-        pyperclip.copy(transcript.text)
+        # Lade die bekannten Halluzinationstexte
+        hallucination_file = os.path.join(os.path.dirname(__file__), 'hallucination.json')
+        with open(hallucination_file, 'r', encoding='utf-8') as f:
+            hallucinations = json.load(f)
+        
+        # Filtere Halluzinationen basierend auf der aktuellen Sprache
+        filtered_text = transcript.text
+        lang_key = current_language
+        
+        # Fallback auf 'en', wenn die aktuelle Sprache nicht in den Halluzinationen vorhanden ist
+        if lang_key not in hallucinations:
+            lang_key = 'en'
+            
+        # Wenn Halluzinationen für die aktuelle Sprache vorhanden sind
+        if lang_key in hallucinations:
+            # Verwende reguläre Ausdrücke für eine bessere Filterung
+            import re
+            
+            # Erstelle eine Liste aller Halluzinationen für die aktuelle Sprache
+            hallucination_patterns = hallucinations[lang_key]
+            
+            # Verarbeite jede Halluzination
+            for pattern in hallucination_patterns:
+                # Entferne führende und abschließende Leerzeichen vom Muster
+                pattern = pattern.strip()
+                
+                # Erstelle einen Regex-Pattern, der unabhängig von Groß-/Kleinschreibung ist
+                # und auch Teile des Textes findet
+                if pattern:
+                    # Escape spezielle Regex-Zeichen im Muster
+                    escaped_pattern = re.escape(pattern)
+                    # Erstelle den Regex mit Flags für Groß-/Kleinschreibung und Multiline
+                    regex = re.compile(escaped_pattern, re.IGNORECASE | re.MULTILINE)
+                    # Ersetze alle Vorkommen durch leeren String
+                    filtered_text = regex.sub('', filtered_text)
+            
+            # Entferne doppelte Leerzeichen und bereinige den Text
+            filtered_text = re.sub(r'\s+', ' ', filtered_text).strip()
+            
+            # Protokolliere die Filterung für Debugging-Zwecke
+            if filtered_text != transcript.text:
+                print(f"Halluzination gefiltert: Original: '{transcript.text}' -> Gefiltert: '{filtered_text}'")
+        
+        # Füge den gefilterten transkribierten Text ein
+        pyperclip.copy(filtered_text)
         pyautogui.hotkey('ctrl', 'v')
         
-        print(f"Transkription abgeschlossen: {transcript.text}")
-        return transcript.text
+        print(f"Transkription abgeschlossen: {filtered_text}")
+        return filtered_text
     except Exception as e:
         print(f"Fehler bei der Transkription: {e}")
         # Stoppe die Animation im Fehlerfall
