@@ -39,18 +39,12 @@ current_language = "de"  # Standardsprache: Deutsch
 animation_running = False
 animation_id = None
 animation_canvas = None
-is_minimal_mode = True  # Standardmäßig im Minimal-Modus starten
-selected_mic_index = 0  # Index des ausgewählten Mikrofons
-available_mics = []  # Liste der verfügbaren Mikrofone
+is_minimal_mode = False  # Neue Variable für den Minimal-Modus
 
 def create_status_window():
     """Erstellt ein schwebendes Statusfenster."""
     global status_window, status_label, animation_frame, animation_labels, keyboard_enabled, animation_canvas
     global is_minimal_mode
-    
-    #############################################################
-    # SCHRITT 1: GRUNDLEGENDE FENSTER- UND DESIGN-EINSTELLUNGEN #
-    #############################################################
     
     # Farbschema
     bg_color = "#424242"  # Dunkelgrau
@@ -66,35 +60,20 @@ def create_status_window():
     status_window = ctk.CTk()
     status_window.title("Spracherkennung")
     
-    #############################################################
-    # SCHRITT 2: FENSTERGRÖSSE UND POSITION KONFIGURIEREN      #
-    #############################################################
+    # WINDOW DIMENSIONS - Change these values to adjust the overall window size
+    window_width = 220   # Width of the window in pixels (increased from 200 to 220 for better button visibility)
+    window_height = 120  # Height of the window in pixels
+    status_window.geometry(f"{window_width}x{window_height}")  # Format: "WidthxHeight"
     
-    # Fenstergröße basierend auf Modus (minimal oder normal) festlegen
-    if is_minimal_mode:
-        # MINIMAL MODE DIMENSIONS
-        window_width = 220   # Breite des Fensters in Pixeln
-        window_height = 40   # Minimale Höhe für den Minimal-Modus
-    else:
-        # NORMAL MODE DIMENSIONS
-        window_width = 220   # Breite des Fensters in Pixeln
-        window_height = 120  # Normale Höhe für den Standard-Modus
+    status_window.attributes("-topmost", True)  # Window stays on top
+    status_window.overrideredirect(True)  # Removes the title bar
     
-    status_window.geometry(f"{window_width}x{window_height}")  # Format: "BreitexHöhe"
-    
-    status_window.attributes("-topmost", True)  # Fenster bleibt immer im Vordergrund
-    status_window.overrideredirect(True)  # Entfernt die Titelleiste
-    
-    # Fensterposition - Zentriert das Fenster auf dem Bildschirm
+    # Window position - Centers the window on the screen
     screen_width = status_window.winfo_screenwidth()
     screen_height = status_window.winfo_screenheight()
     x_position = (screen_width - window_width) // 2
     y_position = (screen_height - window_height) // 2
-    status_window.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")  # Format: "BreitexHöhe+X+Y"
-    
-    #############################################################
-    # SCHRITT 3: HAUPTRAHMEN UND INHALTSRAHMEN ERSTELLEN       #
-    #############################################################
+    status_window.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")  # Format: "WidthxHeight+X+Y"
     
     # Main frame
     main_frame = ctk.CTkFrame(status_window, corner_radius=15, fg_color="#333333", border_width=0)
@@ -104,59 +83,51 @@ def create_status_window():
     content_frame = ctk.CTkFrame(main_frame, corner_radius=12, fg_color="#333333", border_width=0)
     content_frame.pack(fill="both", expand=True, padx=5, pady=5)
     
-    #############################################################
-    # SCHRITT 4: OBERER BEREICH - ANIMATION UND SPRACHSTEUERUNG #
-    #############################################################
-    
     # TOP SECTION - Animation and language controls
     top_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
-    top_frame.pack(pady=2)  # Vertikaler Abstand
+    top_frame.pack(pady=2)  # Vertical spacing
     
-    # Animation frame (linke Seite des top_frame)
+    # Animation frame (left side of top_frame)
     animation_frame = ctk.CTkFrame(top_frame, corner_radius=0, fg_color="transparent")
-    animation_frame.grid(row=0, column=0, padx=2)  # Horizontaler Abstand
+    animation_frame.grid(row=0, column=0, padx=2)  # Horizontal spacing
     
-    # ANIMATION SETTINGS - Anpassung der Visualisierungsbalken
+    # ANIMATION SETTINGS - Customize the visualization bars
     animation_labels = []
-    # Höhen für die 7 Balken (höchste in der Mitte, nach außen abnehmend)
-    heights = [12, 16, 20, 24, 20, 16, 12]  # Höhe jedes Balkens in Pixeln
+    # Heights for the 7 bars (highest in the middle, decreasing outward)
+    heights = [12, 16, 20, 24, 20, 16, 12]  # Height of each bar in pixels
     
-    # Canvas für präzise Positionierung
+    # Canvas for precise positioning
     global animation_canvas
-    canvas_width = 100  # Breite des Animations-Canvas
-    canvas_height = 24  # Höhe des Animations-Canvas
+    canvas_width = 100  # Width of the animation canvas
+    canvas_height = 24  # Height of the animation canvas
     animation_canvas = ctk.CTkCanvas(animation_frame, width=canvas_width, height=canvas_height, 
                                     bg="#333333", highlightthickness=0)
     animation_canvas.pack()
     
     # ANIMATION BAR SETTINGS
-    bar_width = 6       # Breite jedes Balkens in Pixeln
-    bar_spacing = 6     # Abstand zwischen den Balken in Pixeln
+    bar_width = 6       # Width of each bar in pixels
+    bar_spacing = 6     # Spacing between bars in pixels
     total_bars_width = (len(heights) * bar_width) + ((len(heights) - 1) * bar_spacing)
     
-    # Startpunkt berechnen, um die Balken zu zentrieren
+    # Calculate starting point to center the bars
     start_x = (canvas_width - total_bars_width) / 2
     
-    # Balken auf dem Canvas erstellen
+    # Create bars on the canvas
     for i in range(7):
-        # Position für jeden Balken berechnen
+        # Calculate position for each bar
         x_pos = start_x + i * (bar_width + bar_spacing)
         height = heights[i]
-        y_pos = canvas_height - height  # Positioniere alle Balken mit Basis bei y=canvas_height
+        y_pos = canvas_height - height  # Position all bars with base at y=canvas_height
         
-        # Rechteck für den Balken erstellen
+        # Create rectangle for the bar
         bar = animation_canvas.create_rectangle(
             x_pos, y_pos, x_pos + bar_width, canvas_height,  # x1, y1, x2, y2
             fill="#555555", outline=""
         )
         animation_labels.append(bar)
     
-    #############################################################
-    # SCHRITT 5: SPRACHSCHALTER UND MINIMAL-MODUS-BUTTON       #
-    #############################################################
-    
     # LANGUAGE TOGGLE SETTINGS
-    # Sprachumschalter (rechte Seite des top_frame)
+    # Language toggle switch (right side of top_frame)
     lang_switch_var = ctk.StringVar(value="DE")
     lang_switch = ctk.CTkSwitch(
         top_frame,
@@ -165,144 +136,104 @@ def create_status_window():
         variable=lang_switch_var,
         onvalue="DE",
         offvalue="EN",
-        width=40,          # Breite des Schalters
-        height=20,         # Höhe des Schalters
-        switch_width=36,   # Breite des Schalter-Sliders
-        switch_height=18,  # Höhe des Schalter-Sliders
-        corner_radius=10,  # Abgerundete Ecken
-        progress_color="#1E88E5"  # Blau
+        width=40,          # Width of the switch
+        height=20,         # Height of the switch
+        switch_width=36,   # Width of the switch slider
+        switch_height=18,  # Height of the switch slider
+        corner_radius=10,  # Rounded corners
+        progress_color="#1E88E5"  # Blue
     )
-    lang_switch.grid(row=0, column=1, padx=5)  # Horizontaler Abstand
+    lang_switch.grid(row=0, column=1, padx=5)  # Horizontal spacing
     
-    # Sprachstatus-Label
+    # Language status label
     lang_label = ctk.CTkLabel(
         top_frame,
         text="DE",
         font=("Arial", 10, "bold"),
         text_color="#FFFFFF"
     )
-    lang_label.grid(row=0, column=2, padx=2)  # Horizontaler Abstand
+    lang_label.grid(row=0, column=2, padx=2)  # Horizontal spacing
     
-    # MINIMAL MODE BUTTON - Größe und Position nach Bedarf anpassen
+    # MINIMAL MODE BUTTON - Adjust size and position as needed
     minimal_button = ctk.CTkButton(
         top_frame,
-        text="⚊",  # Unicode-Symbol für Minimieren
+        text="⚊",  # Unicode symbol for minimize
         command=toggle_minimal_mode,
-        width=24,           # Breite des Buttons (erhöht von 20 auf 24)
-        height=20,          # Höhe des Buttons
-        corner_radius=10,   # Abgerundete Ecken
+        width=24,           # Width of the button (increased from 20 to 24)
+        height=20,          # Height of the button
+        corner_radius=10,   # Rounded corners
         fg_color=button_bg,
-        hover_color="#1976D2",  # Dunkleres Blau beim Hover
+        hover_color="#1976D2",  # Darker blue on hover
         font=("Arial", 10, "bold")
     )
-    minimal_button.grid(row=0, column=3, padx=3)  # Erhöhter horizontaler Abstand
-    
-    #############################################################
-    # SCHRITT 6: HAUPTBUTTONS - START UND STOP                 #
-    #############################################################
+    minimal_button.grid(row=0, column=3, padx=3)  # Increased horizontal spacing
     
     # MAIN BUTTONS SECTION - Start and Stop
     button_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
+    button_frame.pack(pady=2)  # Vertical spacing
     
-    # BUTTON DIMENSIONS - Ändern Sie diese Werte, um alle Hauptbuttons anzupassen
-    button_width = 65    # Breite der Hauptbuttons (reduziert für 3 Buttons in einer Reihe)
-    button_height = 28   # Höhe der Hauptbuttons
+    # BUTTON DIMENSIONS - Change these values to adjust all main buttons
+    button_width = 85    # Width of main buttons
+    button_height = 28   # Height of main buttons
     
     # Start button
     record_button = ctk.CTkButton(
         button_frame, 
         text="Start", 
         command=start_recording_thread,
-        corner_radius=10,       # Abgerundete Ecken
-        height=button_height,   # Button-Höhe
-        width=button_width,     # Button-Breite
+        corner_radius=10,       # Rounded corners
+        height=button_height,   # Button height
+        width=button_width,     # Button width
         fg_color=button_bg,
-        hover_color="#1976D2"   # Dunkleres Blau beim Hover
+        hover_color="#1976D2"   # Darker blue on hover
     )
-    record_button.grid(row=0, column=0, padx=2)  # Horizontaler Abstand
+    record_button.grid(row=0, column=0, padx=2)  # Horizontal spacing
     
     # Stop button
     stop_button = ctk.CTkButton(
         button_frame, 
         text="Stop", 
         command=stop_recording,
-        corner_radius=10,       # Abgerundete Ecken
-        height=button_height,   # Button-Höhe
-        width=button_width,     # Button-Breite
+        corner_radius=10,       # Rounded corners
+        height=button_height,   # Button height
+        width=button_width,     # Button width
         fg_color=button_bg,
-        hover_color="#1976D2"   # Dunkleres Blau beim Hover
+        hover_color="#1976D2"   # Darker blue on hover
     )
-    stop_button.grid(row=0, column=1, padx=2)  # Horizontaler Abstand
+    stop_button.grid(row=0, column=1, padx=2)  # Horizontal spacing
     
-    # Mic button - NEU
-    mic_button = ctk.CTkButton(
-        button_frame, 
-        text="Mic", 
-        command=select_microphone,
-        corner_radius=10,       # Abgerundete Ecken
-        height=button_height,   # Button-Höhe
-        width=button_width,     # Button-Breite
-        fg_color=button_bg,
-        hover_color="#1976D2"   # Dunkleres Blau beim Hover
-    )
-    mic_button.grid(row=0, column=2, padx=2)  # Horizontaler Abstand
-    
-    #############################################################
-    # SCHRITT 7: UNTERER BEREICH - TASTATUR-STEUERUNG UND STATUS #
-    #############################################################
-    
-    # BOTTOM SECTION - Keyboard control and status
+    # BOTTOM SECTION - Mute and Quit
     bottom_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
+    bottom_frame.pack(pady=2)  # Vertical spacing
     
-    # Keyboard toggle button
-    keyboard_button = ctk.CTkButton(
+    # Mute button
+    mute_button = ctk.CTkButton(
         bottom_frame, 
-        text="Tastatur: An", 
+        text="Mute", 
         command=toggle_keyboard,
-        corner_radius=10,
-        height=24,          # Reduzierte Höhe für den unteren Button
-        width=110,          # Breite des Buttons
-        fg_color=button_bg,
-        hover_color="#1976D2"
+        corner_radius=10,       # Rounded corners
+        height=button_height,   # Button height
+        width=button_width,     # Button width
+        fg_color=button_bg_muted if not keyboard_enabled else button_bg,
+        hover_color="#1976D2"   # Darker blue on hover
     )
-    keyboard_button.grid(row=0, column=0, padx=2)
+    mute_button.grid(row=0, column=0, padx=2)  # Horizontal spacing
     
     # Quit button
     quit_button = ctk.CTkButton(
         bottom_frame, 
         text="Beenden", 
         command=quit_app,
-        corner_radius=10,
-        height=24,          # Reduzierte Höhe für den unteren Button
-        width=60,           # Reduzierte Breite für den Beenden-Button
-        fg_color="#E53935", # Rot für den Beenden-Button
-        hover_color="#C62828" # Dunkleres Rot beim Hover
+        corner_radius=10,       # Rounded corners
+        height=button_height,   # Button height
+        width=button_width,     # Button width
+        fg_color=button_bg,
+        hover_color="#1976D2"   # Darker blue on hover
     )
-    quit_button.grid(row=0, column=1, padx=2)
+    quit_button.grid(row=0, column=1, padx=2)  # Horizontal spacing
     
-    #############################################################
-    # SCHRITT 8: FENSTER-DRAG-FUNKTIONALITÄT HINZUFÜGEN         #
-    #############################################################
-    
-    # Drag functionality
+    # Drag-Funktionalität hinzufügen
     add_drag_functionality(status_window)
-    
-    #############################################################
-    # SCHRITT 9: MODUS-ABHÄNGIGE ANZEIGE DER ELEMENTE           #
-    #############################################################
-    
-    # Im Minimal-Modus die Button- und Bottom-Frames ausblenden
-    if is_minimal_mode:
-        button_frame.pack_forget()  # Button-Frame nicht anzeigen
-        bottom_frame.pack_forget()  # Bottom-Frame nicht anzeigen
-    else:
-        # Im normalen Modus alle Frames anzeigen
-        button_frame.pack(pady=2)  # Vertikaler Abstand
-        bottom_frame.pack(pady=2)  # Vertikaler Abstand
-    
-    #############################################################
-    # SCHRITT 10: TASTATUR-SHORTCUTS EINRICHTEN                 #
-    #############################################################
     
     # Keyboard-Shortcuts
     status_window.bind(f"<{START_RECORDING_KEY.replace('ctrl', 'Control').replace('+', '-')}>", lambda event: start_recording_thread())
@@ -400,7 +331,7 @@ def record_audio(fs=44100):
     
     print("Aufnahme läuft... Drücke 'Strg+Y' zum Stoppen.")
     recording = []
-    stream = sd.InputStream(samplerate=fs, channels=1, dtype='int16', device=selected_mic_index)
+    stream = sd.InputStream(samplerate=fs, channels=1, dtype='int16')
     stream.start()
     
     # Kleine Verzögerung, um doppelte Tastendrücke zu vermeiden
@@ -587,9 +518,9 @@ def toggle_keyboard():
     
     # Farbschema
     button_bg = "#1E88E5"  # Blau für Buttons
-    button_bg_muted = "#666666"  # Dunkleres Grau für deaktivierten Button
+    button_bg_muted = "#666666"  # Dunkleres Grau für Mute-Button, wenn aktiviert
     
-    # Finde den Tastatur-Button und aktualisiere Text und Farbe
+    # Finde den Mute-Button und aktualisiere die Farbe
     for widget in status_window.winfo_children():
         if isinstance(widget, ctk.CTkFrame):
             for child in widget.winfo_children():
@@ -597,29 +528,11 @@ def toggle_keyboard():
                     for grandchild in child.winfo_children():
                         if isinstance(grandchild, ctk.CTkFrame):
                             for item in grandchild.winfo_children():
-                                if isinstance(item, ctk.CTkButton) and ("Tastatur" in item.cget("text")):
-                                    # Aktualisiere Text und Farbe basierend auf dem Status
+                                if isinstance(item, ctk.CTkButton) and item.cget("text") == "Mute":
                                     if keyboard_enabled:
-                                        item.configure(text="Tastatur: An", fg_color=button_bg)
+                                        item.configure(fg_color=button_bg)  # Standard-Farbe
                                     else:
-                                        item.configure(text="Tastatur: Aus", fg_color=button_bg_muted)
-                                    return
-    
-    # Alternative Suche, falls der Button nicht gefunden wurde
-    all_widgets = status_window.winfo_children()
-    for widget in all_widgets:
-        if hasattr(widget, 'winfo_children'):
-            for child in widget.winfo_children():
-                if hasattr(child, 'winfo_children'):
-                    for grandchild in child.winfo_children():
-                        if hasattr(grandchild, 'winfo_children'):
-                            for item in grandchild.winfo_children():
-                                if isinstance(item, ctk.CTkButton) and ("Tastatur" in str(item.cget("text"))):
-                                    # Aktualisiere Text und Farbe basierend auf dem Status
-                                    if keyboard_enabled:
-                                        item.configure(text="Tastatur: An", fg_color=button_bg)
-                                    else:
-                                        item.configure(text="Tastatur: Aus", fg_color=button_bg_muted)
+                                        item.configure(fg_color=button_bg_muted)  # Dunklere Farbe
                                     return
 
 def quit_app():
@@ -688,94 +601,60 @@ def toggle_minimal_mode():
     """Wechselt zwischen normalem und minimalem Modus."""
     global status_window, is_minimal_mode, animation_frame
     
-    # Referenzen auf die Frames im Fenster finden
+    # Find all frames in the window
     all_frames = status_window.winfo_children()
-    if not all_frames:
-        return
-        
     main_frame = all_frames[0]  # Main frame is the first child
-    if not main_frame.winfo_children():
-        return
-        
     content_frame = main_frame.winfo_children()[0]  # Content frame is the first child of main frame
     
-    # Alle Frames im Content-Frame finden
+    # Find all frames in the content frame
     frames_in_content = content_frame.winfo_children()
     
-    # Frames identifizieren
+    # Identify the frames
     top_frame = None
     button_frame = None
     bottom_frame = None
     
-    # Frames nach ihrer Position im Fenster identifizieren
     for frame in frames_in_content:
-        if isinstance(frame, ctk.CTkFrame):
-            # Verwende den Namen des Frames, wenn er gesetzt wurde
-            if hasattr(frame, '_name') and frame._name:
-                if 'top' in frame._name.lower():
-                    top_frame = frame
-                elif 'button' in frame._name.lower():
-                    button_frame = frame
-                elif 'bottom' in frame._name.lower():
-                    bottom_frame = frame
-            # Ansonsten nach Position im Fenster identifizieren
-            elif frame.winfo_y() < 30:  # Oberer Bereich
-                top_frame = frame
-            elif frame.winfo_y() < 60:  # Mittlerer Bereich
-                button_frame = frame
-            else:  # Unterer Bereich
-                bottom_frame = frame
-    
-    # Suche nach den Frames, die möglicherweise nicht angezeigt werden
-    if not button_frame or not bottom_frame:
-        for widget in content_frame.winfo_children():
-            if isinstance(widget, ctk.CTkFrame):
-                # Prüfe, ob es sich um einen der gesuchten Frames handelt
-                for child in widget.winfo_children():
-                    if isinstance(child, ctk.CTkButton):
-                        if child.cget("text") == "Start":
-                            button_frame = widget
-                        elif child.cget("text") == "Beenden":
-                            bottom_frame = widget
+        if frame.winfo_y() < 30:  # Upper area
+            top_frame = frame
+        elif frame.winfo_y() < 60:  # Middle area
+            button_frame = frame
+        else:  # Lower area
+            bottom_frame = frame
     
     if is_minimal_mode:
-        # Wechsel zum normalen Modus
+        # Switch back to normal mode
         if button_frame:
-            # Stelle sicher, dass der Button-Frame angezeigt wird
-            button_frame.pack(pady=2, after=top_frame)
+            button_frame.pack(pady=2)
         if bottom_frame:
-            # Stelle sicher, dass der Bottom-Frame angezeigt wird
-            bottom_frame.pack(pady=2, after=button_frame)
+            bottom_frame.pack(pady=2)
         
-        # NORMAL MODE DIMENSIONS - Ändere diese Werte, um die normale Fenstergröße anzupassen
-        window_width = 220    # Normale Fensterbreite
-        window_height = 120   # Normale Fensterhöhe
+        # NORMAL MODE DIMENSIONS - Change these values to adjust the normal window size
+        window_width = 220    # Normal window width (increased from 200 to 220)
+        window_height = 120   # Normal window height
         status_window.geometry(f"{window_width}x{window_height}")
         
-        # Zentriere das Fenster erneut
+        # Center the window again
         screen_width = status_window.winfo_screenwidth()
         screen_height = status_window.winfo_screenheight()
         x_position = (screen_width - window_width) // 2
         y_position = (screen_height - window_height) // 2
         status_window.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
         
-        # Aktualisiere das Fenster, um die Änderungen anzuzeigen
-        status_window.update()
-        
         is_minimal_mode = False
     else:
-        # Wechsel zum minimalen Modus
+        # Switch to minimal mode
         if button_frame:
             button_frame.pack_forget()
         if bottom_frame:
             bottom_frame.pack_forget()
         
-        # MINIMAL MODE DIMENSIONS - Ändere diese Werte, um die minimale Fenstergröße anzupassen
-        window_width = 220   # Minimale Fensterbreite
-        window_height = 40   # Minimale Fensterhöhe
+        # MINIMAL MODE DIMENSIONS - Change these values to adjust the minimal window size
+        window_width = 220   # Minimal window width (increased from 200 to 220)
+        window_height = 40   # Minimal window height
         status_window.geometry(f"{window_width}x{window_height}")
         
-        # Zentriere das Fenster erneut
+        # Center the window again
         screen_width = status_window.winfo_screenwidth()
         screen_height = status_window.winfo_screenheight()
         x_position = (screen_width - window_width) // 2
@@ -784,101 +663,9 @@ def toggle_minimal_mode():
         
         is_minimal_mode = True
 
-def get_available_microphones():
-    """Gibt eine Liste der verfügbaren Mikrofone zurück."""
-    try:
-        devices = sd.query_devices()
-        # Nur Eingabegeräte filtern
-        mics = []
-        seen_names = set()  # Für Duplikaterkennung
-        
-        # Sammle alle Eingabegeräte
-        for i, device in enumerate(devices):
-            # Prüfe, ob es sich um ein Eingabegerät handelt
-            if device['max_input_channels'] > 0:
-                device_name = device['name']
-                # Überspringe Duplikate
-                if device_name not in seen_names:
-                    mics.append({'index': i, 'name': device_name})
-                    seen_names.add(device_name)
-        
-        return mics
-    except Exception as e:
-        print(f"Fehler beim Abrufen der Mikrofone: {e}")
-        return [{'index': 0, 'name': 'Standard-Mikrofon'}]
-
-def select_microphone():
-    """Öffnet ein Dialogfenster zur Auswahl des Mikrofons."""
-    global selected_mic_index, available_mics, status_window
-    
-    if not available_mics:
-        available_mics = get_available_microphones()
-    
-    # Erstelle ein neues Fenster für die Mikrofonauswahl
-    mic_window = ctk.CTkToplevel(status_window)
-    mic_window.title("Mikrofon auswählen")
-    mic_window.geometry("300x250")
-    mic_window.attributes("-topmost", True)
-    
-    # Zentriere das Fenster
-    screen_width = mic_window.winfo_screenwidth()
-    screen_height = mic_window.winfo_screenheight()
-    x_position = (screen_width - 300) // 2
-    y_position = (screen_height - 250) // 2
-    mic_window.geometry(f"300x250+{x_position}+{y_position}")
-    
-    # Überschrift
-    ctk.CTkLabel(
-        mic_window, 
-        text="Verfügbare Mikrofone:", 
-        font=("Arial", 14, "bold")
-    ).pack(pady=(15, 5))
-    
-    # Frame für die Mikrofonliste
-    list_frame = ctk.CTkFrame(mic_window, fg_color="transparent")
-    list_frame.pack(fill="both", expand=True, padx=10, pady=5)
-    
-    # Scrollbare Liste für Mikrofone
-    scrollable_frame = ctk.CTkScrollableFrame(list_frame, width=280, height=150)
-    scrollable_frame.pack(fill="both", expand=True)
-    
-    # Radiobutton-Variable
-    selected_var = ctk.IntVar(value=selected_mic_index)
-    
-    # Füge Radiobuttons für jedes Mikrofon hinzu
-    for mic in available_mics:
-        radio = ctk.CTkRadioButton(
-            scrollable_frame,
-            text=mic['name'],
-            value=mic['index'],
-            variable=selected_var,
-            font=("Arial", 12)
-        )
-        radio.pack(anchor="w", pady=2, padx=5)
-    
-    # OK-Button
-    def on_ok():
-        global selected_mic_index
-        selected_mic_index = selected_var.get()
-        mic_window.destroy()
-    
-    ctk.CTkButton(
-        mic_window,
-        text="OK",
-        command=on_ok,
-        width=100,
-        height=30,
-        corner_radius=10,
-        fg_color="#1E88E5",
-        hover_color="#1976D2"
-    ).pack(pady=15)
-
 def main():
     """Hauptfunktion."""
-    global status_window, available_mics
-    
-    # Verfügbare Mikrofone abrufen
-    available_mics = get_available_microphones()
+    global status_window
     
     # GUI erstellen
     status_window = create_status_window()
