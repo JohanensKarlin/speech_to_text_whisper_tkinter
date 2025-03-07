@@ -1,91 +1,108 @@
-# Sprache Zu Text - Spracherkennung und Transkription
+# Speech to Text - Voice Recognition and Transcription
 
-## Projektübersicht
-Eine Python-basierte Spracherkennungsanwendung mit minimalistischer, schwebender Benutzeroberfläche zur Transkription von Audio in Deutsch und Englisch.
+## Project Overview
+A Python-based speech recognition application with a minimalist, floating user interface for transcribing audio in German and English using OpenAI's Whisper API.
 
-## Kernfunktionalität
-- Aufnahme von Audio über das Mikrofon
-- Transkription von Audio mit OpenAIs Whisper API
-- Automatisches Einfügen der Transkription an der Cursorposition
-- Unterstützung für mehrere Sprachen (Deutsch und Englisch)
+## Core Functionality
+- Record audio through your microphone
+- Transcribe audio using OpenAI's Whisper API
+- Automatically insert transcriptions at cursor position
+- Support for multiple languages (German and English)
+- Floating UI with minimal and normal modes
 
-## Technischer Stack
+## Technical Stack
 - Python 3.10+
-- Bibliotheken:
-  - sounddevice (Audioaufnahme)
-  - tkinter (GUI)
-  - keyboard (globale Tastenkombinationen)
-  - pyautogui (Texteinfügung)
-  - pyperclip (Zwischenablage-Management)
-  - OpenAI (Transkription)
+- Libraries:
+  - sounddevice (audio recording)
+  - numpy (audio data processing)
+  - customtkinter (enhanced GUI)
+  - keyboard (global hotkeys)
+  - pyautogui (text insertion)
+  - pyperclip (clipboard management)
+  - OpenAI (transcription service)
 
-## Benutzeroberfläche
-- Kompaktes, rahmenloses Fenster mit abgerundeten Ecken
-- Dunkelgraues Farbschema (#424242)
-- Ziehbare Oberfläche
-- Immer-im-Vordergrund-Verhalten
-- Abgerundete Buttons mit subtilen Hover-Effekten
-- Einheitliche hellgraue Farbe (#9E9E9E)
-- Mute-Button ändert sich zu dunkelgrau (#666666), wenn Tastenkombinationen deaktiviert sind
-- Wellenanimation während der Aufnahme (links nach rechts)
-- Umgekehrte Wellenanimation während der Transkription (rechts nach links)
+## Project Files
+- `speech_to_text.py` - Main application with all functionality
+- `config_example.json` - Example configuration file (rename to config.json and add your API key)
+- `hallucination.json` - Contains phrases to filter out from transcriptions in various languages
+- `requirements.txt` - Lists all required Python packages and versions
+- `start_app.bat` - Batch file to install dependencies and launch the application
+- `Verbesserung_ideen.md` - Future improvement ideas for the project
 
-## Tastenkombinationen
-- Strg+A: Aufnahme starten
-- Strg+S: Aufnahme stoppen
-- Alt+L: Sprache umschalten
-- Alt+M: Tastenkombinationen aktivieren/deaktivieren
-- Alt+Q: Anwendung beenden
+## User Interface
+- Compact, frameless window with rounded corners
+- Dark gray color scheme (#424242)
+- Draggable interface
+- Always-on-top behavior
+- Rounded buttons with subtle hover effects
+- Wave animation during recording (left to right)
+- Reverse wave animation during transcription (right to left)
+- Minimal mode for reduced screen space usage
 
-## Sprachverwaltung
-- Umschalten zwischen Deutsch und Englisch
-- Sprachauswahl über Button
-- OpenAI Whisper API verarbeitet die Transkriptionssprache
+## Hotkeys
+- Ctrl+Y: Start/Stop recording
+- Alt+L: Toggle language
+- Alt+M: Enable/disable keyboard shortcuts
+- Alt+Q: Quit application
 
-## Anwendung starten
+## Language Management
+- Switch between German and English
+- Language selection via button
+- OpenAI Whisper API processes transcription language
 
-### Methode 1: Batch-Datei (mit Konsolenfenster)
-Doppelklicken Sie auf `start_app.bat`, um die Anwendung zu starten. Diese Datei:
-- Installiert automatisch alle benötigten Abhängigkeiten
-- Startet die Anwendung mit einem sichtbaren Konsolenfenster
+## Getting Started
 
-### Methode 2: VBS-Skript (ohne Konsolenfenster)
-Doppelklicken Sie auf `start_app_hidden.vbs`, um die Anwendung ohne Konsolenfenster zu starten.
+### Prerequisites
+- Python 3.10 or newer
+- OpenAI API key
 
-### Methode 3: Ausführbare Datei (.exe)
-Eine eigenständige ausführbare Datei kann mit PyInstaller erstellt werden:
+### Installation
+1. Clone or download this repository
+2. Rename `config_example.json` to `config.json` and add your OpenAI API key
+3. Install dependencies using one of the startup methods below
+
+### Starting the Application
+
+#### Method 1: Batch File (with console window)
+Double-click `start_app.bat` to launch the application. This file:
+- Automatically installs all required dependencies
+- Starts the application with a visible console window
+
+#### Method 2: VBS Script (without console window)
+Double-click `start_app_hidden.vbs` to start the application without a console window.
+
+#### Method 3: Executable File (.exe)
+A standalone executable can be created using PyInstaller:
 
 ```bash
-# Installieren der neuesten Hooks
+# Install the latest hooks
 pip install -U pyinstaller-hooks-contrib
 
-# Erstellen der ausführbaren Datei
-pyinstaller --onefile --windowed --recursive-copy-metadata openai --recursive-copy-metadata tqdm --hidden-import=openai --hidden-import=tqdm --name="SpracheZuText" speech_to_text.py
+# Create the executable
+pyinstaller --onefile --windowed --recursive-copy-metadata openai --recursive-copy-metadata tqdm --hidden-import=openai --hidden-import=tqdm --name="SpeechToText" speech_to_text.py
 ```
 
-Die ausführbare Datei wird im Ordner `dist` erstellt und kann auf jeden Windows-Computer kopiert und ausgeführt werden, ohne dass Python installiert sein muss.
+The executable will be created in the `dist` folder and can be copied and run on any Windows computer without Python installed.
 
-## Autostart einrichten
-1. Drücken Sie `Win+R`, geben Sie `shell:startup` ein und drücken Sie Enter
-2. Kopieren Sie `start_app_hidden.vbs` oder eine Verknüpfung zur .exe-Datei in diesen Ordner
+## Setting Up Autostart
+1. Press `Win+R`, type `shell:startup` and press Enter
+2. Copy `start_app_hidden.vbs` or a shortcut to the .exe file into this folder
 
-## Bekannte Probleme und Lösungen
-- **OpenAI-Modul-Fehler bei .exe**: Verwenden Sie die oben genannten PyInstaller-Optionen, um Metadaten und versteckte Abhängigkeiten einzuschließen
-- **Fenster springt beim Klicken**: Behoben durch verbesserte Drag-Funktionalität
-- **Mehrfache Mute-Button-Aktivierung**: Behoben durch Verzögerung zwischen Klicks
+## Known Issues and Solutions
+- **OpenAI module error with .exe**: Use the PyInstaller options mentioned above to include metadata and hidden dependencies
+- **Window jumps when clicking**: Fixed with improved drag functionality
+- **Multiple mute button activations**: Fixed with delay between clicks
 
-## Sicherheitshinweise
-- Der OpenAI API-Schlüssel ist derzeit im Code hartcodiert
-- Für Produktionsumgebungen sollte der API-Schlüssel in Umgebungsvariablen oder einer sicheren Konfigurationsdatei gespeichert werden
+## Security Notes
+- Store your OpenAI API key in the config.json file
+- For production environments, the API key should be stored in environment variables or a secure configuration file
 
-## Zukünftige Verbesserungen
-1. Konfigurationsdatei-Unterstützung
-2. Protokollierungsmechanismus
-3. Installer/Paketierungsskript
-4. Umfassende Unit- und Integrationstests
-5. Weitere Sprachoptionen
-6. Benutzerdefinierte Tastenkombinationen
-7. Benutzerdefinierte UI-Themes
-8. Detailliertere Aufnahmesteuerung
-9. Verbesserte Fehlerbehandlung
-10. Leistungsoptimierungen
+## Future Improvements
+See the `Verbesserung_ideen.md` file for a detailed list of planned improvements, including:
+1. Enhanced user interface with themes and customization
+2. Improved audio processing with noise reduction
+3. Advanced transcription features
+4. Custom hotkeys
+5. Transcript history and management
+6. Integration with other tools and services
+7. Performance optimizations
