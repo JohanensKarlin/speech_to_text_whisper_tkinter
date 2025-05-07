@@ -42,11 +42,13 @@ animation_canvas = None
 is_minimal_mode = True  # Standardmäßig im Minimal-Modus starten
 selected_mic_index = 0  # Index des ausgewählten Mikrofons
 available_mics = []  # Liste der verfügbaren Mikrofone
+transform_text_enabled = False  # Neu: Zustand für Texttransformation
+transform_text_var = None # Neu: Variable für den Switch
 
 def create_status_window():
     """Erstellt ein schwebendes Statusfenster."""
     global status_window, status_label, animation_frame, animation_labels, keyboard_enabled, animation_canvas
-    global is_minimal_mode
+    global is_minimal_mode, transform_text_var # transform_text_var hinzugefügt
     
     #############################################################
     # SCHRITT 1: GRUNDLEGENDE FENSTER- UND DESIGN-EINSTELLUNGEN #
@@ -73,11 +75,11 @@ def create_status_window():
     # Fenstergröße basierend auf Modus (minimal oder normal) festlegen
     if is_minimal_mode:
         # MINIMAL MODE DIMENSIONS
-        window_width = 220   # Breite des Fensters in Pixeln
+        window_width = 280   # Breite des Fensters in Pixeln (erhöht von 220)
         window_height = 40   # Minimale Höhe für den Minimal-Modus
     else:
         # NORMAL MODE DIMENSIONS
-        window_width = 220   # Breite des Fensters in Pixeln
+        window_width = 280   # Breite des Fensters in Pixeln (erhöht von 220, optional anpassbar)
         window_height = 120  # Normale Höhe für den Standard-Modus
     
     status_window.geometry(f"{window_width}x{window_height}")  # Format: "BreitexHöhe"
@@ -183,9 +185,34 @@ def create_status_window():
     )
     lang_label.grid(row=0, column=2, padx=2)  # Horizontaler Abstand
     
+    # NEU: TRANSFORM TEXT TOGGLE
+    global transform_text_var # Sicherstellen, dass es die globale Variable ist
+    transform_text_var = ctk.BooleanVar(value=transform_text_enabled)
+    transform_switch = ctk.CTkSwitch(
+        top_frame,
+        text="", # Kein Text direkt am Switch
+        variable=transform_text_var,
+        command=toggle_transform_text, # Neuer Callback
+        onvalue=True,
+        offvalue=False,
+        width=40,
+        height=20,
+        switch_width=36,
+        switch_height=18,
+        corner_radius=10,
+        progress_color="#00D100"  # Grün für diesen Schalter
+    )
+    transform_switch.grid(row=0, column=3, padx=(5,2)) # Nach dem lang_label
+
+    # Tooltip für den neuen Schalter (optional, aber gut für UX)
+    # Hier könnte man eine kleine Info-Icon oder Text daneben setzen
+    # transform_info_label = ctk.CTkLabel(top_frame, text="T", font=("Arial", 10), text_color="#FFFFFF")
+    # transform_info_label.grid(row=0, column=4, padx=(0,5))
+    # Tooltip-Logik würde komplexer, daher erstmal ohne für Einfachheit
+
     # MINIMAL MODE BUTTON - Größe und Position nach Bedarf anpassen
     minimal_button = ctk.CTkButton(
-        top_frame,
+        top_frame, 
         text="⚊",  # Unicode-Symbol für Minimieren
         command=toggle_minimal_mode,
         width=24,           # Breite des Buttons (erhöht von 20 auf 24)
@@ -195,7 +222,7 @@ def create_status_window():
         hover_color="#1976D2",  # Dunkleres Blau beim Hover
         font=("Arial", 10, "bold")
     )
-    minimal_button.grid(row=0, column=3, padx=3)  # Erhöhter horizontaler Abstand
+    minimal_button.grid(row=0, column=4, padx=3)  # Geändert von column=3 zu column=4
     
     #############################################################
     # SCHRITT 6: HAUPTBUTTONS - START UND STOP                 #
@@ -486,7 +513,8 @@ def transcribe_audio(audio_file):
             hallucinations = json.load(f)
         
         # Filtere Halluzinationen basierend auf der aktuellen Sprache
-        filtered_text = transcript.text
+        original_transcription = transcript.text # Originale Transkription sichern
+        filtered_text = original_transcription
         lang_key = current_language
         
         # Fallback auf 'en', wenn die aktuelle Sprache nicht in den Halluzinationen vorhanden ist
@@ -520,14 +548,52 @@ def transcribe_audio(audio_file):
             filtered_text = re.sub(r'\s+', ' ', filtered_text).strip()
             
             # Protokolliere die Filterung für Debugging-Zwecke
-            if filtered_text != transcript.text:
-                print(f"Halluzination gefiltert: Original: '{transcript.text}' -> Gefiltert: '{filtered_text}'")
+            if filtered_text != original_transcription:
+                print(f"Halluzination gefiltert: Original: '{original_transcription}' -> Gefiltert: '{filtered_text}'")
         
+        # NEU: Texttransformation mit gpt-4o-mini, falls aktiviert
+        global transform_text_enabled # Zugriff auf globale Variable
+        if transform_text_enabled and filtered_text:
+            print("INFO: Texttransformation wird versucht...")
+            try:
+                transformation_prompt = (
+                    "Diese Nachricht wurde automatisch über ein Voice-to-Speech-Tool aufgenommen und soll nun an Projekt-Teilnehmer gehen oder Team-Mitglieder. "
+                    "Bitte korrigiere sie nur leicht auf grammatikalische Fehler, damit der Lesefluss besser ist, da die Nachricht mit Sprache aufgenommen worden ist. "
+                    "Der Ton soll ähnlich bleiben, so wie an Team-Mitglieder, die sehr gut miteinander umgehen. Kein förmlicher Oberton. "
+                    "Gib NUR den korrigierten Text zurück, ohne zusätzliche Erklärungen oder Einleitungen."
+                    "Verzichte auf eigene Antworte, wie z.B. gerne ändere ich den Text für dich."
+                    "das Sprachtool verwendet zum beispiel keine Zeilenumbrüche nach der Begrüßung, füge diese hinzu"
+                )
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini", # Dein gewünschtes Modell
+                    messages=[
+                        {"role": "system", "content": "Du bist ein hilfreicher Assistent, der Texte basierend auf Spracherkennung leicht korrigiert und den informellen Ton beibehält."},
+                        {"role": "user", "content": f"{transformation_prompt}\n\nOriginaltext:\n\"{filtered_text}\""}
+                    ],
+                    temperature=0.5 # Etwas Kreativität erlauben, aber nicht zu viel
+                )
+                
+                transformed_text = response.choices[0].message.content.strip()
+                
+                # Manchmal fügen Modelle trotzdem Anführungszeichen am Anfang/Ende hinzu
+                if transformed_text.startswith('"') and transformed_text.endswith('"'):
+                    transformed_text = transformed_text[1:-1]
+                
+                print(f"Text transformiert: Original: '{filtered_text}' -> Transformiert: '{transformed_text}'")
+                filtered_text = transformed_text # Verwende den transformierten Text
+            except Exception as e:
+                print(f"Fehler bei der Texttransformation: {e}. Verwende ursprünglichen Text.")
+                # Im Fehlerfall wird der bisherige filtered_text (nach Halluzinationsfilter) verwendet
+
         # Füge den gefilterten transkribierten Text ein
-        pyperclip.copy(filtered_text)
-        pyautogui.hotkey('ctrl', 'v')
+        if filtered_text: # Nur einfügen, wenn Text vorhanden ist
+            pyperclip.copy(filtered_text)
+            pyautogui.hotkey('ctrl', 'v')
+            print(f"Transkription abgeschlossen: {filtered_text}")
+        else:
+            print("Transkription ergab keinen Text nach Filterung/Transformation.")
         
-        print(f"Transkription abgeschlossen: {filtered_text}")
         return filtered_text
     except Exception as e:
         print(f"Fehler bei der Transkription: {e}")
@@ -748,7 +814,7 @@ def toggle_minimal_mode():
             bottom_frame.pack(pady=2, after=button_frame)
         
         # NORMAL MODE DIMENSIONS - Ändere diese Werte, um die normale Fenstergröße anzupassen
-        window_width = 220    # Normale Fensterbreite
+        window_width = 280    # Normale Fensterbreite
         window_height = 120   # Normale Fensterhöhe
         status_window.geometry(f"{window_width}x{window_height}")
         
@@ -771,7 +837,7 @@ def toggle_minimal_mode():
             bottom_frame.pack_forget()
         
         # MINIMAL MODE DIMENSIONS - Ändere diese Werte, um die minimale Fenstergröße anzupassen
-        window_width = 220   # Minimale Fensterbreite
+        window_width = 280   # Minimale Fensterbreite
         window_height = 40   # Minimale Fensterhöhe
         status_window.geometry(f"{window_width}x{window_height}")
         
@@ -872,6 +938,16 @@ def select_microphone():
         fg_color="#1E88E5",
         hover_color="#1976D2"
     ).pack(pady=15)
+
+def toggle_transform_text():
+    """Callback für den Texttransformations-Schalter."""
+    global transform_text_enabled, transform_text_var
+    transform_text_enabled = transform_text_var.get()
+    if transform_text_enabled:
+        print("Text-Transformation AKTIVIERT") # Für Debugging
+        # Hier könnte man z.B. das Icon des Schalters ändern oder ein Label aktualisieren
+    else:
+        print("Text-Transformation DEAKTIVIERT") # Für Debugging
 
 def main():
     """Hauptfunktion."""
