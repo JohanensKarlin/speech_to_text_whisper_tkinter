@@ -11,7 +11,7 @@ A Python-based speech recognition application with a minimalist, floating user i
 - Floating UI with minimal and normal modes
 
 ## Technical Stack
-- Python 3.10+
+- Python 3.12
 - Libraries:
   - sounddevice (audio recording)
   - numpy (audio data processing)
@@ -25,9 +25,12 @@ A Python-based speech recognition application with a minimalist, floating user i
 - `speech_to_text.py` - Main application with all functionality
 - `config_example.json` - Example configuration file (rename to config.json and add your API key)
 - `hallucination.json` - Contains phrases to filter out from transcriptions in various languages
-- `requirements.txt` - Lists all required Python packages and versions
 - `start_app.bat` - Batch file to install dependencies and launch the application
 - `Verbesserung_ideen.md` - Future improvement ideas for the project
+- `requirements.txt` - Lists all required Python packages and versions
+- `pyproject.toml` - Project configuration file for dependency management and build settings
+- `uv.lock` - Lock file for uv package manager that tracks exact versions of dependencies for aligned collaboration
+- `.python-version` - Specifies the Python version (3.10+) required for the project
 
 ## User Interface
 - Compact, frameless window with rounded corners
@@ -53,7 +56,7 @@ A Python-based speech recognition application with a minimalist, floating user i
 ## Getting Started
 
 ### Prerequisites
-- Python 3.10 or newer
+- Python 3.12 or newer
 - OpenAI API key
 
 ### Installation
