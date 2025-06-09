@@ -30,7 +30,7 @@ A Python-based speech recognition application with a minimalist, floating user i
 - `requirements.txt` - Lists all required Python packages and versions
 - `pyproject.toml` - Project configuration file for dependency management and build settings
 - `uv.lock` - Lock file for uv package manager that tracks exact versions of dependencies for aligned collaboration
-- `.python-version` - Specifies the Python version (3.10+) required for the project
+- `.python-version` - Specifies the Python version (3.12) required for the project
 
 ## User Interface
 - Compact, frameless window with rounded corners
