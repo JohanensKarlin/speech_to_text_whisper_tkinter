@@ -35,5 +35,7 @@ Thumbs.db
 # Umgebungsvariablen
 .env
 venv
+.venv
+
 # Konfigurationsdatei
 config.json
