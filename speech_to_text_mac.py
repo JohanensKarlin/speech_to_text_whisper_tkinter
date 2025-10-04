@@ -74,6 +74,52 @@ def paste_text(text):
         except Exception as e2:
             print(f"Hinweis: Einfügen fehlgeschlagen ({e2}). Text ist in der Zwischenablage.")
 
+def _choose_input_device(preferred_index=None, fallback_samplerate=44100):
+    """Wählt ein valides Eingabegerät und gibt (device_index, channels, samplerate) zurück.
+    Fällt auf Standard- oder erstes verfügbares Eingabegerät zurück.
+    """
+    try:
+        devices = sd.query_devices()
+    except Exception:
+        # Im Zweifel Standardgerät benutzen
+        default_dev = sd.default.device
+        default_in = default_dev[0] if isinstance(default_dev, (list, tuple)) else default_dev
+        return (default_in if default_in is not None else None, 1, fallback_samplerate)
+
+    def is_valid_input(i):
+        try:
+            return i is not None and 0 <= i < len(devices) and devices[i].get('max_input_channels', 0) > 0
+        except Exception:
+            return False
+
+    # 1) Bevorzugtes Gerät prüfen
+    idx = preferred_index if is_valid_input(preferred_index) else None
+
+    # 2) Standardgerät verwenden, wenn vorhanden
+    if idx is None:
+        default_dev = sd.default.device
+        default_in = default_dev[0] if isinstance(default_dev, (list, tuple)) else default_dev
+        if is_valid_input(default_in):
+            idx = default_in
+
+    # 3) Erstes verfügbares Eingabegerät suchen
+    if idx is None:
+        for i, d in enumerate(devices):
+            if d.get('max_input_channels', 0) > 0:
+                idx = i
+                break
+
+    if idx is None:
+        raise RuntimeError("Kein gültiges Eingabegerät gefunden (keine Mikrofone verfügbar).")
+
+    max_in = int(devices[idx].get('max_input_channels', 0) or 0)
+    sr = int(devices[idx].get('default_samplerate') or fallback_samplerate)
+    # Nutze 1 Kanal, wenn möglich; andernfalls das, was das Gerät erlaubt
+    channels = 1 if max_in >= 1 else max_in
+    if channels <= 0:
+        raise RuntimeError("Das ausgewählte Gerät unterstützt keine Eingabekanäle.")
+    return idx, channels, sr
+
 def create_status_window():
     """Erstellt ein schwebendes Statusfenster."""
     global status_window, status_label, animation_frame, animation_labels, keyboard_enabled, animation_canvas
@@ -451,7 +497,14 @@ def record_audio(fs=44100):
     
     print("Aufnahme läuft... Stop über den Stop-Button.")
     recording = []
-    stream = sd.InputStream(samplerate=fs, channels=1, dtype='int16', device=selected_mic_index)
+    # Wähle ein valides Gerät und passende Kanal-/Samplerate-Einstellungen
+    dev_idx, channels, samplerate = _choose_input_device(preferred_index=selected_mic_index, fallback_samplerate=fs)
+    try:
+        dev_info = sd.query_devices(dev_idx)
+        print(f"Eingabegerät: #{dev_idx} '{dev_info.get('name', '?')}', max_in_channels={dev_info.get('max_input_channels')}, SR={samplerate}")
+    except Exception:
+        pass
+    stream = sd.InputStream(samplerate=samplerate, channels=channels, dtype='int16', device=dev_idx)
     stream.start()
     
     # Kleine Verzögerung, um doppelte Tastendrücke zu vermeiden
@@ -459,7 +512,7 @@ def record_audio(fs=44100):
     
     try:
         while is_recording:
-            chunk = stream.read(fs)[0]  # 1 Sekunde Audio
+            chunk = stream.read(samplerate)[0]  # 1 Sekunde Audio bei gewählter SR
             recording.append(chunk)
     finally:
         stream.stop()
@@ -469,11 +522,26 @@ def record_audio(fs=44100):
     
     # Prüfe, ob Audiodaten aufgenommen wurden
     if len(recording) > 0:
+        data = np.concatenate(recording)
+        # Diagnose: Pegel prüfen
+        try:
+            rms = float(np.sqrt(np.mean(data.astype(np.float64) ** 2))) if data.size else 0.0
+            print(f"Audio RMS: {rms:.2f} (SR={samplerate}, channels={channels})")
+            if rms < 50:  # sehr niedriger Pegel -> Debug-Datei schreiben
+                debug_path = os.path.join(os.path.dirname(__file__), 'debug_recording.wav')
+                with wave.open(debug_path, 'wb') as wf:
+                    wf.setnchannels(int(channels))
+                    wf.setsampwidth(2)
+                    wf.setframerate(int(samplerate))
+                    wf.writeframes(data.tobytes())
+                print(f"Hinweis: Sehr niedriger Pegel. Debug-Aufnahme gespeichert unter: {debug_path}")
+        except Exception:
+            pass
         start_reverse_animation()  # Starte die Rückwärts-Animation für Transkription
-        return np.concatenate(recording)
+        return data, samplerate, channels
     else:
         print("Keine Audiodaten aufgenommen.")
-        return np.array([])  # Leeres Array zurückgeben
+        return np.array([]), fs, 1  # Leeres Array zurückgeben
 
 def start_reverse_animation():
     """Startet die Rückwärts-Animation für die Transkription."""
@@ -483,13 +551,13 @@ def start_reverse_animation():
         animation_running = True
         run_reverse_animation(0)
 
-def audio_to_wav(audio_data, fs=44100):
-    """Konvertiert Audio in WAV-Format im Speicher."""
+def audio_to_wav(audio_data, fs=44100, channels=1):
+    """Konvertiert Audio in WAV-Format im Speicher mit korrekten Parametern."""
     wav_file = io.BytesIO()
     with wave.open(wav_file, 'wb') as wf:
-        wf.setnchannels(1)
+        wf.setnchannels(int(channels))
         wf.setsampwidth(2)
-        wf.setframerate(fs)
+        wf.setframerate(int(fs))
         wf.writeframes(audio_data.tobytes())
     wav_file.seek(0)
     return wav_file
@@ -628,9 +696,9 @@ def start_recording_thread():
 
 def process_recording():
     """Prozess für Aufnahme und Transkription."""
-    audio_data = record_audio()
+    audio_data, samplerate, channels = record_audio()
     if audio_data.size > 0:
-        wav_file = audio_to_wav(audio_data)
+        wav_file = audio_to_wav(audio_data, fs=samplerate, channels=channels)
         transcribe_audio(wav_file)
     else:
         print("Keine Aufnahme erkannt.")
