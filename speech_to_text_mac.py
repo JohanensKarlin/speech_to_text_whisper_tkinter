@@ -3,9 +3,7 @@ import numpy as np
 import io
 import wave
 import pyperclip
-import keyboard
 import time
-import pyautogui
 import threading
 import customtkinter as ctk
 from openai import OpenAI
@@ -57,6 +55,24 @@ selected_mic_index = 0  # Index des ausgewählten Mikrofons
 available_mics = []  # Liste der verfügbaren Mikrofone
 transform_text_enabled = False  # Neu: Zustand für Texttransformation
 transform_text_var = None # Neu: Variable für den Switch
+
+def paste_text(text):
+    """Kopiert Text und fügt mit Command+V ein. Fällt auf AppleScript zurück."""
+    pyperclip.copy(text)
+    try:
+        # Lazy import to avoid macOS CFData issues on import
+        import pyautogui
+        pyautogui.hotkey('command', 'v')
+    except Exception as e:
+        try:
+            import subprocess
+            subprocess.run([
+                "/usr/bin/osascript",
+                "-e",
+                'tell application "System Events" to keystroke "v" using {command down}'
+            ], check=False)
+        except Exception as e2:
+            print(f"Hinweis: Einfügen fehlgeschlagen ({e2}). Text ist in der Zwischenablage.")
 
 def create_status_window():
     """Erstellt ein schwebendes Statusfenster."""
@@ -344,13 +360,7 @@ def create_status_window():
     # SCHRITT 10: TASTATUR-SHORTCUTS EINRICHTEN                 #
     #############################################################
     
-    # Keyboard-Shortcuts (optional; standardmäßig deaktiviert auf macOS)
-    if keyboard_enabled:
-        status_window.bind(f"<{START_RECORDING_KEY.replace('ctrl', 'Control').replace('+', '-')}>", lambda event: start_recording_thread())
-        status_window.bind(f"<{STOP_RECORDING_KEY.replace('ctrl', 'Control').replace('+', '-')}>", lambda event: stop_recording())
-        status_window.bind(f"<{TOGGLE_LANGUAGE_KEY.replace('alt', 'Alt').replace('+', '-')}>", lambda event: toggle_language())
-        status_window.bind(f"<{TOGGLE_KEYBOARD_KEY.replace('alt', 'Alt').replace('+', '-')}>", lambda event: toggle_keyboard())
-        status_window.bind(f"<{QUIT_APP_KEY.replace('alt', 'Alt').replace('+', '-')}>", lambda event: quit_app())
+    # Keyboard-Shortcuts deaktiviert: Start/Stop per Buttons
     
     # Fokus auf das Fenster setzen und nach vorne bringen
     status_window.focus_force()
@@ -439,7 +449,7 @@ def record_audio(fs=44100):
     is_recording = True
     start_wave_animation()  # Starte die Animation
     
-    print("Aufnahme läuft... Drücke 'Strg+Y' zum Stoppen.")
+    print("Aufnahme läuft... Stop über den Stop-Button.")
     recording = []
     stream = sd.InputStream(samplerate=fs, channels=1, dtype='int16', device=selected_mic_index)
     stream.start()
@@ -598,8 +608,7 @@ def transcribe_audio(audio_file):
 
         # Füge den gefilterten transkribierten Text ein
         if filtered_text: # Nur einfügen, wenn Text vorhanden ist
-            pyperclip.copy(filtered_text)
-            pyautogui.hotkey('command', 'v')  # macOS: Command+V
+            paste_text(filtered_text)
             print(f"Transkription abgeschlossen: {filtered_text}")
         else:
             print("Transkription ergab keinen Text nach Filterung/Transformation.")
@@ -705,29 +714,7 @@ def quit_app():
         status_window.destroy()
 
 def check_keyboard_input():
-    """Überprüft Tastatureingaben im Hintergrund."""
-    global is_recording, status_window, keyboard_enabled
-    
-    if keyboard_enabled:
-        # Verwende eine Verzögerung zwischen den Tastenprüfungen
-        if keyboard.is_pressed(START_RECORDING_KEY) and not is_recording:
-            start_recording_thread()
-            # Kleine Verzögerung, um doppelte Tastendrücke zu vermeiden
-            time.sleep(0.3)
-        elif keyboard.is_pressed(STOP_RECORDING_KEY) and is_recording:
-            stop_recording()
-            # Kleine Verzögerung, um doppelte Tastendrücke zu vermeiden
-            time.sleep(0.3)
-        elif keyboard.is_pressed(TOGGLE_LANGUAGE_KEY):
-            toggle_language()
-            time.sleep(0.3)
-        elif keyboard.is_pressed(TOGGLE_KEYBOARD_KEY):
-            toggle_keyboard()
-            time.sleep(0.3)
-        elif keyboard.is_pressed(QUIT_APP_KEY):  # Nur Alt+Q beendet die App
-            if status_window:
-                status_window.destroy()
-            return False
+    """Hotkeys sind auf macOS deaktiviert; Funktion bleibt als no-op bestehen."""
     return True
 
 def add_drag_functionality(window):
