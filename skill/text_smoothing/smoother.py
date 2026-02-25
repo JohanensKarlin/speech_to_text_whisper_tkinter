@@ -1,4 +1,4 @@
-Hallo Test, funktionierst du noch oder nicht?# =============================================================================
+# =============================================================================
 # SKILL/TEXT_SMOOTHING/SMOOTHER.PY – GPT-Nachbearbeitung (Text glätten)
 # =============================================================================
 # Wird von processing.transcription aufgerufen wenn transform_enabled=True.
