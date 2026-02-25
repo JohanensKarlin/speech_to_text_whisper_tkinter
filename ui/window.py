@@ -164,18 +164,28 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     )
     kb_btn.grid(row=0, column=3, padx=2)
 
-    # Zeile 2: Settings, Quit (links)
+    # Zeile 2: Smoothing, API, Keys, Quit (links)
     bottom_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
-    settings_btn = ctk.CTkButton(
-        bottom_frame, text="Settings", command=callbacks["open_settings"],
-        corner_radius=10, height=24, width=90, fg_color=button_bg, hover_color="#1976D2"
+    smooth_btn = ctk.CTkButton(
+        bottom_frame, text="Smoothing", command=callbacks["open_smoothing"],
+        corner_radius=10, height=24, width=85, fg_color=button_bg, hover_color="#1976D2"
     )
-    settings_btn.grid(row=0, column=0, padx=2)
+    smooth_btn.grid(row=0, column=0, padx=2)
+    api_btn = ctk.CTkButton(
+        bottom_frame, text="API", command=callbacks["open_api"],
+        corner_radius=10, height=24, width=60, fg_color=button_bg, hover_color="#1976D2"
+    )
+    api_btn.grid(row=0, column=1, padx=2)
+    keys_btn = ctk.CTkButton(
+        bottom_frame, text="Keys", command=callbacks["open_keys"],
+        corner_radius=10, height=24, width=55, fg_color=button_bg, hover_color="#1976D2"
+    )
+    keys_btn.grid(row=0, column=2, padx=2)
     quit_btn = ctk.CTkButton(
         bottom_frame, text="Quit", command=callbacks["quit_app"],
         corner_radius=10, height=24, width=60, fg_color="#E53935", hover_color="#C62828"
     )
-    quit_btn.grid(row=0, column=1, padx=2)
+    quit_btn.grid(row=0, column=3, padx=2)
 
     _add_drag(win)
 
@@ -190,6 +200,7 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     # Tk-Bindings: hotkeys["start_stop"] -> start_stop_toggle, rest -> jeweiliger Callback
     sk = _tk_bind_key(hotkeys.get("start_stop", "ctrl+y"))
     win.bind(f"<{sk}>", lambda e: callbacks["start_stop_toggle"]())
+    refs["hotkey_start_stop_tk"] = sk
     for bind_name, cb_key in [
         ("toggle_language", "toggle_language"),
         ("toggle_keyboard", "toggle_keyboard"),

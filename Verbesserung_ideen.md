@@ -1,4 +1,4 @@
-Improving the User Interface
+Ilo Test, was sagst du dazu?Weil das Starten dauert immer so lange. Ich möchte einfach eine On-Dose-App anklicken und die ist sofort da, anstatt mit Start bald.Improving the User Interface
 1. Progress Indicator for Transcription
 The current application shows an animation during recording, but users might benefit from a visual indicator showing transcription progress:
 
