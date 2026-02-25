@@ -14,6 +14,10 @@ Damit du schnell weisst: Wo die Oberflaeche gebaut wird, wie Callbacks und refs 
 
 ## Module
 
+### constants.py
+
+- **LABEL_SPRACHE**, **LABEL_GLAETTEN**, **WINDOW_WIDTH** – Einheitliche Labels und Fensterbreite (320px). Werden in window.py und in Tests (Design-Check ohne GUI) genutzt.
+
 ### window.py
 
 - **create_status_window(callbacks, hotkeys, initial_state, refs)**  

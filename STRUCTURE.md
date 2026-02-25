@@ -14,6 +14,7 @@ Sprache Zu Text/
     recording.py        # record_audio(device, stop_event), audio_to_wav(), get_available_microphones()
     transcription.py    # transcribe(client, wav, language, hallucination_path, transform_enabled)
   ui/
+    constants.py        # LABEL_SPRACHE, LABEL_GLAETTEN, WINDOW_WIDTH (Design, Tests)
     window.py           # create_status_window(callbacks, hotkeys, initial_state, refs)
     animation.py        # init_animation(), start/stop_wave_animation(), start_reverse_animation()
   skill/
@@ -22,4 +23,4 @@ Sprache Zu Text/
 
 App aus Projektroot starten (z.B. `uv run python speech_to_text.py` oder venv + `python speech_to_text.py`).
 
-Tests: `python tests/run_tests.py` (von Projektroot). Bei fehlenden Abhaengigkeiten werden Tests uebersprungen (SKIP). Volle Suite mit venv: `uv run python tests/run_tests.py` oder `tests/run_tests.bat`.
+Tests: `python tests/run_tests.py` (von Projektroot). Design-Check (Sprache/Glaetten-Labels, Fensterbreite 320) laeuft ohne GUI; bei fehlenden Abhaengigkeiten werden weitere Tests uebersprungen (SKIP). Volle Suite: `uv run python tests/run_tests.py`.

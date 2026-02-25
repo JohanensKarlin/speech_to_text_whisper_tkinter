@@ -33,14 +33,13 @@ A Python-based speech recognition application with a minimalist, floating user i
 - `.python-version` - Specifies the Python version (3.12) required for the project
 
 ## User Interface
-- Compact, frameless window with rounded corners
+- Compact, frameless window (320px width) with rounded corners
+- Labels: "Sprache" (language) and "Glätten" (text smoothing) for clear toggles
+- Settings: API key, custom smoother prompts, smoother model (gpt-4o-mini etc.) via Einstellungen
 - Dark gray color scheme (#424242)
-- Draggable interface
-- Always-on-top behavior
-- Rounded buttons with subtle hover effects
-- Wave animation during recording (left to right)
-- Reverse wave animation during transcription (right to left)
-- Minimal mode for reduced screen space usage
+- Draggable interface, always-on-top
+- Wave animation during recording; reverse during transcription
+- Minimal mode for reduced screen space
 
 ## Hotkeys
 - Ctrl+Y: Start/Stop recording

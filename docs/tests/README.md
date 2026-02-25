@@ -30,13 +30,16 @@ Damit du schnell weisst: Was getestet wird, wie du die Tests ausfuehrst, und wo 
 | Test | Was geprueft wird | Abhaengigkeit |
 |------|--------------------|----------------|
 | config load_config | Dict mit api_key; funktioniert mit vorhandenem config.json oder Temp-Datei | – |
+| config settings load/save | settings.json Roundtrip (API-Key, Custom-Smoother, Modell) | – |
+| ui design labels | LABEL_SPRACHE, LABEL_GLAETTEN, WINDOW_WIDTH in ui/constants.py (ohne GUI) | – |
 | processing get_available_microphones | Liste von Dicts mit index/name | sounddevice |
 | processing audio_to_wav | numpy -> WAV-BytesIO, lesbares RIFF-Format | sounddevice (wegen processing-Import) |
 | processing record_audio (stop_event) | Mit sofort gesetztem Event liefert record_audio leeres Array | sounddevice |
 | skill prompts de/en | get_prompts liefert system+user fuer de/en; unbekannte Sprache -> de | – |
 | skill smooth_transcription empty | Leerer/Whitespace-Text wird unveraendert zurueckgegeben (kein API-Call) | – |
+| skill smooth_transcription custom prompts | Custom-System/User-Prompts werden an API uebergeben (Mock) | – |
 | transcription filter_hallucinations | hallucination.json wird geladen; Filter entfernt bekannte Phrase (en) | sounddevice (wegen processing-Import) |
-| ui create_status_window | Fenster baut sich mit Dummy-Callbacks; refs wird befuellt; Fenster wird sofort zerstört | customtkinter |
+| ui create_status_window | Fenster baut sich mit Dummy-Callbacks; refs befuellt; Labels Sprache/Glaetten an Schaltern | customtkinter |
 
 Keine Tests fuer: echtes Aufnehmen, echten Whisper-Call, echte Text-Glaettung, Tastatur-Polling. Dafuer waeren Mocks oder Integrationstests noetig.
 
