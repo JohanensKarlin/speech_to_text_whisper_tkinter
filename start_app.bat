@@ -1,13 +1,23 @@
 @echo off
-echo Starte Sprache Zu Text Anwendung...
+cd /d "%~dp0"
 
-:: Überprüfen und Installieren der benötigten Pakete
-echo Überprüfe Abhängigkeiten...
+:: uv: Sync venv and run app without console window
+where uv >nul 2>&1
+if errorlevel 1 (
+  echo uv not found. Install: pip install uv  or  winget install uv
+  pause
+  exit /b 1
+)
 
-:: Verwende den vollständigen Pfad zum Python-Interpreter
-"%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe" -m pip install pyautogui sounddevice keyboard pyperclip openai numpy scipy customtkinter --quiet
+uv sync
+if errorlevel 1 (
+  pause
+  exit /b 1
+)
 
-:: Starten der Anwendung
-echo Starte Anwendung...
-"%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe" speech_to_text.py
-pause
+:: Start without console (pythonw in venv)
+if exist ".venv\Scripts\pythonw.exe" (
+  start "" ".venv\Scripts\pythonw.exe" speech_to_text.py
+) else (
+  start "" uv run speech_to_text.py
+)

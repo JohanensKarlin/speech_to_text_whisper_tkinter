@@ -13,8 +13,10 @@ from .constants import LABEL_SPRACHE, LABEL_GLAETTEN, WINDOW_WIDTH
 
 
 def _tk_bind_key(key_str):
-    """Hotkey-String fuer Tk bind: 'ctrl+y' -> 'Control-y'."""
-    return key_str.replace("ctrl", "Control").replace("+", "-")
+    """Hotkey-String fuer Tk bind: 'ctrl+y' -> 'Control-y', 'alt+l' -> 'Alt-l' (Keysyms case-sensitive unter Windows)."""
+    s = (key_str or "").strip().lower()
+    s = s.replace("ctrl", "Control").replace("alt", "Alt").replace("+", "-")
+    return s
 
 
 def _add_drag(window):
@@ -54,7 +56,7 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     ctk.set_default_color_theme("blue")
 
     win = ctk.CTk()
-    win.title("Spracherkennung")
+    win.title("Speech Recognition")
 
     width = WINDOW_WIDTH
     height = 40 if is_minimal else 120
@@ -100,34 +102,44 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     lang_switch = ctk.CTkSwitch(
         top_frame, text=LABEL_SPRACHE, command=callbacks["toggle_language"],
         variable=lang_switch_var, onvalue="DE", offvalue="EN",
-        width=80, height=20, switch_width=36, switch_height=18, corner_radius=10,
-        progress_color=button_bg, font=("Arial", 9)
+        width=84, height=22, switch_width=38, switch_height=18, corner_radius=10,
+        progress_color=button_bg, font=("Arial", 10)
     )
-    lang_switch.grid(row=0, column=1, padx=(4, 2))
+    lang_switch.grid(row=0, column=1, padx=(6, 4))
     refs["lang_switch_var"] = lang_switch_var
     refs["lang_switch"] = lang_switch
-    lang_label = ctk.CTkLabel(top_frame, text=lang_label_text, font=("Arial", 10, "bold"), text_color="#FFFFFF")
-    lang_label.grid(row=0, column=2, padx=2)
+    lang_label = ctk.CTkLabel(top_frame, text=lang_label_text, font=("Arial", 11, "bold"), text_color="#FFFFFF")
+    lang_label.grid(row=0, column=2, padx=4)
 
-    # Text glätten: Schalter mit erkennbarem Label
+    # Vertikaler Trennstrich zwischen Sprache und Glaetten (Hilfe fuer das Auge)
+    sep = ctk.CTkFrame(top_frame, width=2, height=22, fg_color="#FFFFFF", corner_radius=0)
+    sep.grid(row=0, column=3, padx=8, pady=2)
+    sep.grid_propagate(False)
+
+    # Text glaetten: Schalter mit erkennbarem Label
     transform_var = ctk.BooleanVar(value=transform_enabled)
     transform_switch = ctk.CTkSwitch(
         top_frame, text=LABEL_GLAETTEN, variable=transform_var, command=callbacks["toggle_transform_text"],
-        onvalue=True, offvalue=False, width=72, height=20, switch_width=36, switch_height=18,
-        corner_radius=10, progress_color="#00D100", font=("Arial", 9)
+        onvalue=True, offvalue=False, width=76, height=22, switch_width=38, switch_height=18,
+        corner_radius=10, progress_color="#00D100", font=("Arial", 10)
     )
-    transform_switch.grid(row=0, column=3, padx=(4, 2))
+    transform_switch.grid(row=0, column=4, padx=(4, 2))
     refs["transform_text_var"] = transform_var
     refs["transform_switch"] = transform_switch
+
+    # Zweiter Trennstrich zwischen Glaetten und Minimal-Button (Hilfe fuer das Auge)
+    sep2 = ctk.CTkFrame(top_frame, width=2, height=22, fg_color="#FFFFFF", corner_radius=0)
+    sep2.grid(row=0, column=5, padx=8, pady=2)
+    sep2.grid_propagate(False)
 
     # Minimal-Modus: Button "-" blendet Button-/Bottom-Frame ein/aus (toggle_minimal_mode)
     minimal_btn = ctk.CTkButton(
         top_frame, text="-", command=callbacks["toggle_minimal_mode"],
-        width=24, height=20, corner_radius=10, fg_color=button_bg, hover_color="#1976D2", font=("Arial", 10, "bold")
+        width=28, height=22, corner_radius=10, fg_color=button_bg, hover_color="#1976D2", font=("Arial", 11, "bold")
     )
-    minimal_btn.grid(row=0, column=4, padx=3)
+    minimal_btn.grid(row=0, column=6, padx=(2, 4))
 
-    # Hauptbuttons
+    # Zeile 1: Start, Stop, Mic, Keyboard (links)
     button_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
     bw, bh = 65, 28
     record_btn = ctk.CTkButton(
@@ -145,33 +157,35 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
         corner_radius=10, height=bh, width=bw, fg_color=button_bg, hover_color="#1976D2"
     )
     mic_btn.grid(row=0, column=2, padx=2)
-
-    bottom_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
+    kb_initial = "Keyboard: On" if initial_state.get("keyboard_enabled", True) else "Keyboard: Off"
     kb_btn = ctk.CTkButton(
-        bottom_frame, text="Tastatur: An", command=callbacks["toggle_keyboard"],
-        corner_radius=10, height=24, width=110, fg_color=button_bg, hover_color="#1976D2"
+        button_frame, text=kb_initial, command=callbacks["toggle_keyboard"],
+        corner_radius=10, height=bh, width=100, fg_color=button_bg, hover_color="#1976D2"
     )
-    kb_btn.grid(row=0, column=0, padx=2)
+    kb_btn.grid(row=0, column=3, padx=2)
+
+    # Zeile 2: Settings, Quit (links)
+    bottom_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
     settings_btn = ctk.CTkButton(
-        bottom_frame, text="Einstellungen", command=callbacks["open_settings"],
+        bottom_frame, text="Settings", command=callbacks["open_settings"],
         corner_radius=10, height=24, width=90, fg_color=button_bg, hover_color="#1976D2"
     )
-    settings_btn.grid(row=0, column=1, padx=2)
+    settings_btn.grid(row=0, column=0, padx=2)
     quit_btn = ctk.CTkButton(
-        bottom_frame, text="Beenden", command=callbacks["quit_app"],
+        bottom_frame, text="Quit", command=callbacks["quit_app"],
         corner_radius=10, height=24, width=60, fg_color="#E53935", hover_color="#C62828"
     )
-    quit_btn.grid(row=0, column=2, padx=2)
+    quit_btn.grid(row=0, column=1, padx=2)
 
     _add_drag(win)
 
-    # Im Minimal-Modus Frames nicht packen (oder pack_forget), sonst unter top_frame packen
+    # Im Minimal-Modus Frames nicht packen (oder pack_forget), sonst unter top_frame packen (links ausgerichtet)
     if is_minimal:
         button_frame.pack_forget()
         bottom_frame.pack_forget()
     else:
-        button_frame.pack(pady=2)
-        bottom_frame.pack(pady=2)
+        button_frame.pack(pady=2, anchor="w")
+        bottom_frame.pack(pady=2, anchor="w")
 
     # Tk-Bindings: hotkeys["start_stop"] -> start_stop_toggle, rest -> jeweiliger Callback
     sk = _tk_bind_key(hotkeys.get("start_stop", "ctrl+y"))

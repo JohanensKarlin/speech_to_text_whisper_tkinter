@@ -173,9 +173,9 @@ def test_ui_design_labels():
     spec = importlib.util.spec_from_file_location("ui_constants", p)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    assert mod.LABEL_SPRACHE == "Sprache", "Sprache-Label im Interface"
-    assert mod.LABEL_GLAETTEN == "Glätten", "Glaetten-Label im Interface"
-    assert mod.WINDOW_WIDTH == 320, "Fensterbreite fuer Labels"
+    assert mod.LABEL_SPRACHE == "Language", "Language label in UI"
+    assert mod.LABEL_GLAETTEN == "Smooth", "Smooth label in UI"
+    assert mod.WINDOW_WIDTH == 420, "Window width for layout"
     return True
 
 def test_ui_import_and_create_no_display():

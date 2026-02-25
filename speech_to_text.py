@@ -32,11 +32,13 @@ from processing import (
     audio_to_wav,
     transcribe,
 )
+from skill.text_smoothing.prompts import get_prompts
 from ui import (
     create_status_window,
     start_wave_animation,
     stop_wave_animation,
     start_reverse_animation,
+    WINDOW_WIDTH,
 )
 
 # -----------------------------------------------------------------------------
@@ -183,9 +185,9 @@ def toggle_keyboard():
     kb_btn = refs.get("keyboard_button")
     if kb_btn:
         if state["keyboard_enabled"]:
-            kb_btn.configure(text="Tastatur: An", fg_color="#1E88E5")
+            kb_btn.configure(text="Keyboard: On", fg_color="#1E88E5")
         else:
-            kb_btn.configure(text="Tastatur: Aus", fg_color="#666666")
+            kb_btn.configure(text="Keyboard: Off", fg_color="#666666")
 
 
 def quit_app():
@@ -204,19 +206,22 @@ def toggle_minimal_mode():
     top_frame = refs.get("top_frame")
     if not all([win, button_frame, bottom_frame, content_frame, top_frame]):
         return
+    w = WINDOW_WIDTH
     if state["is_minimal_mode"]:
         button_frame.pack(pady=2, after=top_frame)
         bottom_frame.pack(pady=2, after=button_frame)
-        win.geometry("320x120")
         state["is_minimal_mode"] = False
+        win.update_idletasks()
+        win.geometry(f"{w}x120")
     else:
         button_frame.pack_forget()
         bottom_frame.pack_forget()
-        win.geometry("320x40")
         state["is_minimal_mode"] = True
+        win.update_idletasks()
+        win.geometry(f"{w}x40")
     sw = win.winfo_screenwidth()
     sh = win.winfo_screenheight()
-    w, h = 320, 120 if not state["is_minimal_mode"] else 40
+    h = 120 if not state["is_minimal_mode"] else 40
     win.geometry(f"{w}x{h}+{(sw - w) // 2}+{(sh - h) // 2}")
     win.update()
 
@@ -228,13 +233,13 @@ def select_microphone():
     if not state["available_mics"]:
         state["available_mics"] = get_available_microphones()
     mic_win = ctk.CTkToplevel(win)
-    mic_win.title("Mikrofon auswaehlen")
+    mic_win.title("Select microphone")
     mic_win.geometry("300x250")
     mic_win.attributes("-topmost", True)
     sw = mic_win.winfo_screenwidth()
     sh = mic_win.winfo_screenheight()
     mic_win.geometry(f"300x250+{(sw - 300) // 2}+{(sh - 250) // 2}")
-    ctk.CTkLabel(mic_win, text="Verfuegbare Mikrofone:", font=("Arial", 14, "bold")).pack(pady=(15, 5))
+    ctk.CTkLabel(mic_win, text="Available microphones:", font=("Arial", 14, "bold")).pack(pady=(15, 5))
     list_frame = ctk.CTkFrame(mic_win, fg_color="transparent")
     list_frame.pack(fill="both", expand=True, padx=10, pady=5)
     scroll = ctk.CTkScrollableFrame(list_frame, width=280, height=150)
@@ -264,50 +269,90 @@ def toggle_transform_text():
 
 
 def open_settings():
-    """Oeffnet Einstellungs-Dialog: API-Key, Custom Text-Glaettung (System/User-Prompt). Speichern in settings.json."""
+    """Opens settings dialog: API key, text smoothing (system/user prompts). Saves to settings.json."""
     import customtkinter as ctk
     win = refs.get("window")
     if not win:
         return
     dlg = ctk.CTkToplevel(win)
-    dlg.title("Einstellungen")
-    dlg.geometry("480x420")
+    dlg.title("Settings")
+    dlg_w, dlg_h = 620, 760
+    dlg.geometry(f"{dlg_w}x{dlg_h}")
     dlg.attributes("-topmost", True)
     sw = dlg.winfo_screenwidth()
     sh = dlg.winfo_screenheight()
-    dlg.geometry(f"480x420+{(sw - 480) // 2}+{(sh - 420) // 2}")
+    dlg.geometry(f"{dlg_w}x{dlg_h}+{(sw - dlg_w) // 2}+{(sh - dlg_h) // 2}")
 
-    # API-Key
-    ctk.CTkLabel(dlg, text="API-Key (OpenAI):", font=("Arial", 11, "bold")).pack(anchor="w", padx=15, pady=(15, 2))
-    api_entry = ctk.CTkEntry(dlg, width=440, show="*", placeholder_text="Leer = aus config.json oder bisherigen Einstellungen")
-    api_entry.pack(padx=15, pady=(0, 10))
+    # Scrollbares Frame: Inhalt scrollbar, Scrollleiste rechts
+    scroll = ctk.CTkScrollableFrame(dlg, width=dlg_w - 20, height=dlg_h - 80, fg_color="transparent")
+    scroll.pack(fill="both", expand=True, padx=(10, 0), pady=(10, 10))
+
+    px, py_section = 24, 20
+    font_section = ("Arial", 14, "bold")
+    font_label = ("Arial", 12, "bold")
+    font_body = ("Arial", 11)
+    font_small = ("Arial", 11)
+    entry_w = 560
+    textbox_w = 560
+
+    # API Key
+    ctk.CTkLabel(scroll, text="API Key (OpenAI):", font=font_label).pack(anchor="w", padx=px, pady=(py_section, 6))
+    api_entry = ctk.CTkEntry(
+        scroll, width=entry_w, height=36, font=font_body, show="*",
+        placeholder_text="Leave empty = use config.json or existing settings"
+    )
+    api_entry.pack(padx=px, pady=(0, 8))
     api_entry.insert(0, load_settings(APP_DIR).get(KEY_API_KEY, ""))
     def toggle_show():
         if api_entry.cget("show") == "*":
             api_entry.configure(show="")
         else:
             api_entry.configure(show="*")
-    ctk.CTkButton(dlg, text="Anzeigen", width=80, command=toggle_show).pack(anchor="w", padx=15, pady=(0, 12))
+    ctk.CTkButton(scroll, text="Show", width=100, height=32, font=font_body, command=toggle_show).pack(anchor="w", padx=px, pady=(0, py_section))
 
-    # Text-Glaettung: Modell + Custom-Prompts
-    ctk.CTkLabel(dlg, text="Text glätten (Smoother):", font=("Arial", 11, "bold")).pack(anchor="w", padx=15, pady=(8, 2))
-    ctk.CTkLabel(dlg, text="Modell (Chat-Completion):", font=("Arial", 10)).pack(anchor="w", padx=15, pady=(4, 2))
-    smoother_models = ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
+    # Text smoothing (used when "Smooth" is enabled in the main window)
+    ctk.CTkLabel(scroll, text="Text smoothing (Smoother):", font=font_section).pack(anchor="w", padx=px, pady=(0, 4))
+    ctk.CTkLabel(
+        scroll, text="Used when you turn on 'Smooth' in the main bar. Prompts below define how transcription text is corrected.",
+        font=("Arial", 10), text_color="#AAAAAA"
+    ).pack(anchor="w", padx=px, pady=(0, 6))
+    ctk.CTkLabel(scroll, text="Model (Chat-Completion):", font=font_body).pack(anchor="w", padx=px, pady=(4, 4))
+    smoother_models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
     current_model = state.get("smoother_model", DEFAULT_SMOOTHER_MODEL)
     if current_model and current_model not in smoother_models:
         smoother_models = [current_model] + smoother_models
     model_var = ctk.StringVar(value=current_model)
-    model_combo = ctk.CTkComboBox(dlg, values=smoother_models, variable=model_var, width=280)
-    model_combo.pack(anchor="w", padx=15, pady=(0, 6))
+    model_combo = ctk.CTkComboBox(scroll, values=smoother_models, variable=model_var, width=320, height=36, font=font_body)
+    model_combo.pack(anchor="w", padx=px, pady=(0, 10))
     use_custom_var = ctk.BooleanVar(value=state.get("use_custom_smoother", False))
-    ctk.CTkCheckBox(dlg, text="Custom-Prompts verwenden (sonst Default DE/EN)", variable=use_custom_var).pack(anchor="w", padx=15, pady=2)
-    ctk.CTkLabel(dlg, text="System-Prompt (Rolle):", font=("Arial", 10)).pack(anchor="w", padx=15, pady=(8, 2))
-    sys_text = ctk.CTkTextbox(dlg, width=440, height=60, font=("Arial", 10))
-    sys_text.pack(padx=15, pady=(0, 4))
+    ctk.CTkCheckBox(
+        scroll, text="Use custom prompts (otherwise default DE/EN)", variable=use_custom_var,
+        font=font_body, height=28, checkbox_width=22, checkbox_height=22
+    ).pack(anchor="w", padx=px, pady=(4, py_section))
+
+    # Default prompts (read-only)
+    def_prompts_de = get_prompts("de")
+    ctk.CTkLabel(scroll, text="Default prompts (when not using custom):", font=font_label).pack(anchor="w", padx=px, pady=(0, 6))
+    ctk.CTkLabel(scroll, text="DE System:", font=font_small).pack(anchor="w", padx=px, pady=(4, 2))
+    default_sys_de = ctk.CTkTextbox(scroll, width=textbox_w, height=56, font=font_small, fg_color="#2b2b2b")
+    default_sys_de.pack(padx=px, pady=(0, 6))
+    default_sys_de.insert("1.0", def_prompts_de.get("system", ""))
+    default_sys_de.configure(state="disabled")
+    ctk.CTkLabel(scroll, text="DE User:", font=font_small).pack(anchor="w", padx=px, pady=(4, 2))
+    default_usr_de = ctk.CTkTextbox(scroll, width=textbox_w, height=88, font=font_small, fg_color="#2b2b2b")
+    default_usr_de.pack(padx=px, pady=(0, py_section))
+    default_usr_de.insert("1.0", def_prompts_de.get("user", ""))
+    default_usr_de.configure(state="disabled")
+
+    # Custom prompts (override defaults)
+    ctk.CTkLabel(scroll, text="Custom prompts (override default):", font=font_label).pack(anchor="w", padx=px, pady=(0, 6))
+    ctk.CTkLabel(scroll, text="System prompt (role):", font=font_body).pack(anchor="w", padx=px, pady=(4, 4))
+    sys_text = ctk.CTkTextbox(scroll, width=textbox_w, height=76, font=font_body)
+    sys_text.pack(padx=px, pady=(0, 8))
     sys_text.insert("1.0", state.get("custom_smoother_system", ""))
-    ctk.CTkLabel(dlg, text="User-Prompt (Anweisung + Platzhalter fuer Originaltext):", font=("Arial", 10)).pack(anchor="w", padx=15, pady=(4, 2))
-    user_text = ctk.CTkTextbox(dlg, width=440, height=80, font=("Arial", 10))
-    user_text.pack(padx=15, pady=(0, 10))
+    ctk.CTkLabel(scroll, text="User prompt (instruction + placeholder for original text):", font=font_body).pack(anchor="w", padx=px, pady=(4, 4))
+    user_text = ctk.CTkTextbox(scroll, width=textbox_w, height=100, font=font_body)
+    user_text.pack(padx=px, pady=(0, 8))
     user_text.insert("1.0", state.get("custom_smoother_user", ""))
 
     def on_save():
@@ -332,7 +377,11 @@ def open_settings():
         state["client"] = OpenAI(api_key=effective_key or "dummy")
         dlg.destroy()
 
-    ctk.CTkButton(dlg, text="Speichern", width=120, command=on_save, fg_color="#1E88E5", hover_color="#1976D2").pack(pady=15)
+    ctk.CTkLabel(scroll, text="Saves API key and all settings above.", font=("Arial", 10), text_color="#AAAAAA").pack(pady=(4, 0))
+    ctk.CTkButton(
+        scroll, text="Save", width=140, height=40, font=("Arial", 12, "bold"),
+        command=on_save, fg_color="#1E88E5", hover_color="#1976D2"
+    ).pack(pady=py_section)
 
 
 # -----------------------------------------------------------------------------
@@ -392,7 +441,7 @@ def main():
         "open_settings": open_settings,
     }
     create_status_window(callbacks, HOTKEYS, initial_state, refs)
-    print("Strg+Y Start/Stop, Alt+Q Beenden.")
+    print("Ctrl+Y Start/Stop, Alt+Q Quit.")
 
     def poll():
         try:
