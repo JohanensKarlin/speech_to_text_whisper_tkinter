@@ -41,6 +41,11 @@ from ui import (
     stop_wave_animation,
     start_reverse_animation,
     WINDOW_WIDTH,
+    WINDOW_WIDTH_COMPACT,
+    INFO_BTN_COLOR,
+    INFO_BTN_COLOR_ACTIVE,
+    LABEL_SPRACHE,
+    LABEL_GLAETTEN,
 )
 
 # -----------------------------------------------------------------------------
@@ -71,6 +76,7 @@ state = {
     "selected_mic_index": 0,
     "keyboard_enabled": True,
     "is_minimal_mode": True,
+    "top_bar_compact": True,
     "stop_recording_event": threading.Event(),
     "client": client,  # OpenAI-Client; wird bei Settings-Speichern (neuer API-Key) ersetzt
     "use_custom_smoother": settings.get(KEY_USE_CUSTOM_SMOOTHER, False),
@@ -208,7 +214,7 @@ def toggle_minimal_mode():
     top_frame = refs.get("top_frame")
     if not all([win, button_frame, bottom_frame, content_frame, top_frame]):
         return
-    w = WINDOW_WIDTH
+    w = WINDOW_WIDTH_COMPACT if state.get("top_bar_compact") else WINDOW_WIDTH
     win.update_idletasks()
     wx, wy = win.winfo_x(), win.winfo_y()
     if state["is_minimal_mode"]:
@@ -223,6 +229,73 @@ def toggle_minimal_mode():
         state["is_minimal_mode"] = True
         win.update_idletasks()
         win.geometry(f"{w}x40+{wx}+{wy}")
+    win.update()
+
+
+def toggle_info_compact():
+    """
+    Top-Leiste Kompakt-Modus: Text "Language" und "Smooth" an den Switches weg; DE/EN-Indikator bleibt.
+    Fuenf Elemente sichtbar: Balken, Switch (ohne Label), DE/EN, Switch (ohne Label), i-Button.
+    sep, sep2, minimal_btn ausgeblendet; Fensterbreite WINDOW_WIDTH_COMPACT. i-Button hellgrau.
+    Erneuter Klick: Labels zurueck, sep/minimal sichtbar, i blau.
+    """
+    win = refs.get("window")
+    lang_switch = refs.get("lang_switch")
+    lang_label = refs.get("lang_label")
+    transform_switch = refs.get("transform_switch")
+    sep = refs.get("sep")
+    sep2 = refs.get("sep2")
+    minimal_btn = refs.get("minimal_btn")
+    info_btn = refs.get("info_btn")
+    if not all([win, lang_switch, lang_label, transform_switch, sep, sep2, minimal_btn, info_btn]):
+        return
+    win.update_idletasks()
+    wx, wy = win.winfo_x(), win.winfo_y()
+    h = 40 if state.get("is_minimal_mode") else 120
+    if state.get("top_bar_compact"):
+        state["top_bar_compact"] = False
+        lang_switch.configure(text=LABEL_SPRACHE, width=84)
+        transform_switch.configure(text=LABEL_GLAETTEN, width=76)
+        sep.grid(row=0, column=3, padx=8, pady=2)
+        sep2.grid(row=0, column=5, padx=8, pady=2)
+        minimal_btn.grid(row=0, column=6, padx=(2, 4))
+        info_btn.configure(fg_color=INFO_BTN_COLOR)
+        anim_frame = refs.get("anim_frame")
+        if anim_frame:
+            anim_frame.grid_configure(padx=2)
+        lang_switch.grid_configure(padx=(6, 4))
+        lang_label.grid_configure(padx=4)
+        transform_switch.grid_configure(padx=(4, 2))
+        info_btn.grid_configure(padx=(2, 4))
+        content_frame = refs.get("content_frame")
+        if content_frame:
+            content_frame.pack_configure(padx=5, pady=5)
+        top_frame = refs.get("top_frame")
+        if top_frame:
+            top_frame.pack_configure(pady=2)
+        win.geometry(f"{WINDOW_WIDTH}x{h}+{wx}+{wy}")
+    else:
+        state["top_bar_compact"] = True
+        lang_switch.configure(text="", width=38)
+        transform_switch.configure(text="", width=38)
+        sep.grid_remove()
+        sep2.grid_remove()
+        minimal_btn.grid_remove()
+        info_btn.configure(fg_color=INFO_BTN_COLOR_ACTIVE)
+        anim_frame = refs.get("anim_frame")
+        if anim_frame:
+            anim_frame.grid_configure(padx=(4, 0))
+        lang_switch.grid_configure(padx=(0, 2))
+        lang_label.grid_configure(padx=(0, 8))
+        transform_switch.grid_configure(padx=(0, 6))
+        info_btn.grid_configure(padx=(0, 4))
+        content_frame = refs.get("content_frame")
+        if content_frame:
+            content_frame.pack_configure(padx=0, pady=5)
+        top_frame = refs.get("top_frame")
+        if top_frame:
+            top_frame.pack_configure(pady=0)
+        win.geometry(f"{WINDOW_WIDTH_COMPACT}x{h}+{wx}+{wy}")
     win.update()
 
 
@@ -241,7 +314,21 @@ def open_api_dialog():
     win = refs.get("window")
     if not win:
         return
+        
+    existing_dlg = refs.get("dlg_api")
+    if existing_dlg and existing_dlg.winfo_exists():
+        existing_dlg.destroy()
+        refs["dlg_api"] = None
+        return
+
     dlg = ctk.CTkToplevel(win)
+    refs["dlg_api"] = dlg
+    
+    def on_close():
+        refs["dlg_api"] = None
+        dlg.destroy()
+    dlg.protocol("WM_DELETE_WINDOW", on_close)
+
     dlg.title("API")
     dlg_w, dlg_h = 520, 280
     dlg.geometry(f"{dlg_w}x{dlg_h}")
@@ -289,6 +376,7 @@ def open_api_dialog():
         save_settings(APP_DIR, data)
         state["smoother_model"] = smoother_model
         state["client"] = OpenAI(api_key=new_key or (load_config(APP_DIR).get("api_key") or "").strip() or "dummy")
+        refs["dlg_api"] = None
         dlg.destroy()
 
     ctk.CTkButton(
@@ -306,7 +394,21 @@ def open_smoothing_dialog():
     win = refs.get("window")
     if not win:
         return
+        
+    existing_dlg = refs.get("dlg_smoothing")
+    if existing_dlg and existing_dlg.winfo_exists():
+        existing_dlg.destroy()
+        refs["dlg_smoothing"] = None
+        return
+
     dlg = ctk.CTkToplevel(win)
+    refs["dlg_smoothing"] = dlg
+    
+    def on_close():
+        refs["dlg_smoothing"] = None
+        dlg.destroy()
+    dlg.protocol("WM_DELETE_WINDOW", on_close)
+
     dlg.title("Smoothing")
     dlg_w, dlg_h = 620, 640
     dlg.geometry(f"{dlg_w}x{dlg_h}")
@@ -375,6 +477,7 @@ def open_smoothing_dialog():
         state["use_custom_smoother"] = use_custom
         state["custom_smoother_system"] = custom_sys
         state["custom_smoother_user"] = custom_usr
+        refs["dlg_smoothing"] = None
         dialog.destroy()
 
 
@@ -394,7 +497,21 @@ def open_keys_dialog():
     win = refs.get("window")
     if not win:
         return
+        
+    existing_dlg = refs.get("dlg_keys")
+    if existing_dlg and existing_dlg.winfo_exists():
+        existing_dlg.destroy()
+        refs["dlg_keys"] = None
+        return
+
     dlg = ctk.CTkToplevel(win)
+    refs["dlg_keys"] = dlg
+    
+    def on_close():
+        refs["dlg_keys"] = None
+        dlg.destroy()
+    dlg.protocol("WM_DELETE_WINDOW", on_close)
+
     dlg.title("Keyboard")
     dlg_w, dlg_h = 420, 200
     dlg.geometry(f"{dlg_w}x{dlg_h}")
@@ -435,6 +552,7 @@ def open_keys_dialog():
         new_tk = _tk_bind_key(new_val)
         win.bind(f"<{new_tk}>", lambda e: start_stop_toggle())
         refs["hotkey_start_stop_tk"] = new_tk
+        refs["dlg_keys"] = None
         dlg.destroy()
 
     ctk.CTkButton(btn_frame, text="Default", width=90, height=32, font=font_body, command=load_default, fg_color="#555555", hover_color="#666666").pack(side="left", padx=(0, 8))
@@ -482,6 +600,7 @@ def main():
     """
     initial_state = {
         "is_minimal_mode": state["is_minimal_mode"],
+        "top_bar_compact": state["top_bar_compact"],
         "transform_text_enabled": state["transform_text_enabled"],
         "current_language": state["current_language"],
     }
@@ -493,6 +612,7 @@ def main():
         "toggle_keyboard": toggle_keyboard,
         "quit_app": quit_app,
         "toggle_minimal_mode": toggle_minimal_mode,
+        "toggle_info_compact": toggle_info_compact,
         "toggle_transform_text": toggle_transform_text,
         "open_api": open_api_dialog,
         "open_smoothing": open_smoothing_dialog,

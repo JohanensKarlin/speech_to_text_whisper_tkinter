@@ -192,13 +192,14 @@ def test_ui_import_and_create_no_display():
         "toggle_keyboard": lambda: None,
         "quit_app": lambda: None,
         "toggle_minimal_mode": lambda: None,
+        "toggle_info_compact": lambda: None,
         "toggle_transform_text": lambda: None,
         "open_api": lambda: None,
         "open_smoothing": lambda: None,
         "open_keys": lambda: None,
     }
     hotkeys = {"start_stop": "ctrl+y", "toggle_language": "alt+l", "toggle_keyboard": "alt+m", "quit": "alt+q"}
-    initial = {"is_minimal_mode": True, "transform_text_enabled": False, "current_language": "de"}
+    initial = {"is_minimal_mode": True, "top_bar_compact": False, "transform_text_enabled": False, "current_language": "de"}
     win = create_status_window(callbacks, hotkeys, initial, refs)
     assert win is not None
     assert refs.get("window") is win
