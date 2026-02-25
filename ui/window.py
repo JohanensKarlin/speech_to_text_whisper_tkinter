@@ -14,8 +14,9 @@ from .constants import (
     LABEL_GLAETTEN,
     WINDOW_WIDTH,
     WINDOW_WIDTH_COMPACT,
-    INFO_BTN_COLOR,
-    INFO_BTN_COLOR_ACTIVE,
+    INFO_BTN_BG,
+    INFO_BTN_BG_HOVER,
+    INFO_BTN_TEXT_COLOR,
 )
 
 
@@ -137,25 +138,14 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     refs["transform_text_var"] = transform_var
     refs["transform_switch"] = transform_switch
 
-    # Zweiter Trennstrich zwischen Glaetten und Minimal-Button (Hilfe fuer das Auge)
-    sep2 = ctk.CTkFrame(top_frame, width=2, height=22, fg_color="#FFFFFF", corner_radius=0)
-    sep2.grid(row=0, column=5, padx=8, pady=2)
-    sep2.grid_propagate(False)
-
-    # Minimal-Modus: Button "-" blendet Button-/Bottom-Frame ein/aus (toggle_minimal_mode)
-    minimal_btn = ctk.CTkButton(
-        top_frame, text="-", command=callbacks["toggle_minimal_mode"],
-        width=28, height=22, corner_radius=10, fg_color=button_bg, hover_color="#1976D2", font=("Arial", 11, "bold")
-    )
-    minimal_btn.grid(row=0, column=6, padx=(2, 4))
-
-    # Info-Kompakt: Button "i" faehrt Top-Leiste auf col 0,1,4 + i zusammen; aktiv = hellgrau (toggle_info_compact)
-    info_btn_fg = INFO_BTN_COLOR_ACTIVE if top_bar_compact else INFO_BTN_COLOR
+    # Info-Kompakt (nur noch dieser Toggle): Button "i" faehrt Top-Leiste zusammen und versteckt Bottom-Frames.
+    info_btn_fg = INFO_BTN_BG if top_bar_compact else INFO_BTN_BG
     info_btn = ctk.CTkButton(
         top_frame, text="i", command=callbacks["toggle_info_compact"],
-        width=18, height=18, corner_radius=9, fg_color=info_btn_fg, hover_color="#1976D2", font=("Arial", 11, "bold")
+        width=18, height=18, corner_radius=9, fg_color=info_btn_fg, hover_color=INFO_BTN_BG_HOVER, 
+        text_color=INFO_BTN_TEXT_COLOR, font=("Arial", 11, "bold")
     )
-    info_btn.grid(row=0, column=7, padx=(2, 4))
+    info_btn.grid(row=0, column=6, padx=(2, 4))
 
     # Zeile 1: Start, Stop, Mic, Keyboard (links)
     button_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
@@ -202,27 +192,24 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
 
     _add_drag(win)
 
-    # Kompakt-Modus (i aktiv): nur Switch-Texte "Language"/"Smooth" weg; DE/EN bleibt. sep, sep2, minimal_btn ausblenden.
+    # Kompakt-Modus (i aktiv): nur Switch-Texte "Language"/"Smooth" weg; DE/EN bleibt. sep ausblenden.
     # Minimale Abstaende zwischen den fuenf Elementen (padx/width) fuer kompakte Ansicht.
     if top_bar_compact:
         lang_switch.configure(text="", width=38)
         transform_switch.configure(text="", width=38)
         sep.grid_remove()
-        sep2.grid_remove()
-        minimal_btn.grid_remove()
+        lang_label.grid_remove()
         anim_frame.grid_configure(padx=(4, 0))
         lang_switch.grid_configure(padx=(0, 2))
-        lang_label.grid_configure(padx=(0, 8))
         transform_switch.grid_configure(padx=(0, 6))
         info_btn.grid_configure(padx=(0, 4))
         top_frame.pack_configure(pady=0)
         win.update_idletasks()
         wx, wy = win.winfo_x(), win.winfo_y()
-        h = 40 if is_minimal else 120
-        win.geometry(f"{WINDOW_WIDTH_COMPACT}x{h}+{wx}+{wy}")
+        win.geometry(f"{WINDOW_WIDTH_COMPACT}x40+{wx}+{wy}")
 
-    # Im Minimal-Modus Frames nicht packen (oder pack_forget), sonst unter top_frame packen (links ausgerichtet)
-    if is_minimal:
+    # Im Kompakt-Modus Frames nicht packen (oder pack_forget), sonst unter top_frame packen (links ausgerichtet)
+    if top_bar_compact:
         button_frame.pack_forget()
         bottom_frame.pack_forget()
     else:
@@ -246,8 +233,6 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     refs["anim_frame"] = anim_frame
     refs["lang_label"] = lang_label
     refs["sep"] = sep
-    refs["sep2"] = sep2
-    refs["minimal_btn"] = minimal_btn
     refs["info_btn"] = info_btn
     refs["keyboard_button"] = kb_btn
     refs["button_frame"] = button_frame

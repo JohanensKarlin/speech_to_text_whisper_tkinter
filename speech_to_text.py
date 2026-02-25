@@ -42,8 +42,9 @@ from ui import (
     start_reverse_animation,
     WINDOW_WIDTH,
     WINDOW_WIDTH_COMPACT,
-    INFO_BTN_COLOR,
-    INFO_BTN_COLOR_ACTIVE,
+    INFO_BTN_BG,
+    INFO_BTN_BG_HOVER,
+    INFO_BTN_TEXT_COLOR,
     LABEL_SPRACHE,
     LABEL_GLAETTEN,
 )
@@ -75,7 +76,6 @@ state = {
     "transform_text_enabled": False,
     "selected_mic_index": 0,
     "keyboard_enabled": True,
-    "is_minimal_mode": True,
     "top_bar_compact": True,
     "stop_recording_event": threading.Event(),
     "client": client,  # OpenAI-Client; wird bei Settings-Speichern (neuer API-Key) ersetzt
@@ -205,97 +205,73 @@ def quit_app():
         win.destroy()
 
 
-def toggle_minimal_mode():
-    """Fenster zwischen Minimal (nur Leiste) und Normal (mit Start/Stop/Mic/...) umschalten. Position bleibt erhalten."""
-    win = refs.get("window")
-    button_frame = refs.get("button_frame")
-    bottom_frame = refs.get("bottom_frame")
-    content_frame = refs.get("content_frame")
-    top_frame = refs.get("top_frame")
-    if not all([win, button_frame, bottom_frame, content_frame, top_frame]):
-        return
-    w = WINDOW_WIDTH_COMPACT if state.get("top_bar_compact") else WINDOW_WIDTH
-    win.update_idletasks()
-    wx, wy = win.winfo_x(), win.winfo_y()
-    if state["is_minimal_mode"]:
-        button_frame.pack(pady=2, after=top_frame)
-        bottom_frame.pack(pady=2, after=button_frame)
-        state["is_minimal_mode"] = False
-        win.update_idletasks()
-        win.geometry(f"{w}x120+{wx}+{wy}")
-    else:
-        button_frame.pack_forget()
-        bottom_frame.pack_forget()
-        state["is_minimal_mode"] = True
-        win.update_idletasks()
-        win.geometry(f"{w}x40+{wx}+{wy}")
-    win.update()
-
-
 def toggle_info_compact():
     """
-    Top-Leiste Kompakt-Modus: Text "Language" und "Smooth" an den Switches weg; DE/EN-Indikator bleibt.
-    Fuenf Elemente sichtbar: Balken, Switch (ohne Label), DE/EN, Switch (ohne Label), i-Button.
-    sep, sep2, minimal_btn ausgeblendet; Fensterbreite WINDOW_WIDTH_COMPACT. i-Button hellgrau.
-    Erneuter Klick: Labels zurueck, sep/minimal sichtbar, i blau.
+    Togglet zwischen "Kompakt" (ultra-schmal, 1 Zeile, keine Labels) und "Ausgeklappt" (breit, 3 Zeilen).
     """
     win = refs.get("window")
     lang_switch = refs.get("lang_switch")
     lang_label = refs.get("lang_label")
     transform_switch = refs.get("transform_switch")
     sep = refs.get("sep")
-    sep2 = refs.get("sep2")
-    minimal_btn = refs.get("minimal_btn")
     info_btn = refs.get("info_btn")
-    if not all([win, lang_switch, lang_label, transform_switch, sep, sep2, minimal_btn, info_btn]):
+    button_frame = refs.get("button_frame")
+    bottom_frame = refs.get("bottom_frame")
+    content_frame = refs.get("content_frame")
+    top_frame = refs.get("top_frame")
+    
+    if not all([win, lang_switch, lang_label, transform_switch, sep, info_btn, button_frame, bottom_frame]):
         return
+        
     win.update_idletasks()
     wx, wy = win.winfo_x(), win.winfo_y()
-    h = 40 if state.get("is_minimal_mode") else 120
+    
     if state.get("top_bar_compact"):
+        # Von Kompakt -> Ausgeklappt
         state["top_bar_compact"] = False
         lang_switch.configure(text=LABEL_SPRACHE, width=84)
         transform_switch.configure(text=LABEL_GLAETTEN, width=76)
         sep.grid(row=0, column=3, padx=8, pady=2)
-        sep2.grid(row=0, column=5, padx=8, pady=2)
-        minimal_btn.grid(row=0, column=6, padx=(2, 4))
-        info_btn.configure(fg_color=INFO_BTN_COLOR)
+        lang_label.grid(row=0, column=2, padx=4)
+        info_btn.configure(fg_color=INFO_BTN_BG)
         anim_frame = refs.get("anim_frame")
         if anim_frame:
             anim_frame.grid_configure(padx=2)
         lang_switch.grid_configure(padx=(6, 4))
-        lang_label.grid_configure(padx=4)
         transform_switch.grid_configure(padx=(4, 2))
         info_btn.grid_configure(padx=(2, 4))
-        content_frame = refs.get("content_frame")
         if content_frame:
             content_frame.pack_configure(padx=5, pady=5)
-        top_frame = refs.get("top_frame")
         if top_frame:
             top_frame.pack_configure(pady=2)
-        win.geometry(f"{WINDOW_WIDTH}x{h}+{wx}+{wy}")
+            
+        button_frame.pack(pady=2, after=top_frame)
+        bottom_frame.pack(pady=2, after=button_frame)
+        
+        win.geometry(f"{WINDOW_WIDTH}x120+{wx}+{wy}")
     else:
+        # Von Ausgeklappt -> Kompakt
         state["top_bar_compact"] = True
         lang_switch.configure(text="", width=38)
         transform_switch.configure(text="", width=38)
         sep.grid_remove()
-        sep2.grid_remove()
-        minimal_btn.grid_remove()
-        info_btn.configure(fg_color=INFO_BTN_COLOR_ACTIVE)
+        lang_label.grid_remove()
+        info_btn.configure(fg_color=INFO_BTN_BG)
         anim_frame = refs.get("anim_frame")
         if anim_frame:
             anim_frame.grid_configure(padx=(4, 0))
         lang_switch.grid_configure(padx=(0, 2))
-        lang_label.grid_configure(padx=(0, 8))
         transform_switch.grid_configure(padx=(0, 6))
         info_btn.grid_configure(padx=(0, 4))
-        content_frame = refs.get("content_frame")
         if content_frame:
             content_frame.pack_configure(padx=0, pady=5)
-        top_frame = refs.get("top_frame")
         if top_frame:
             top_frame.pack_configure(pady=0)
-        win.geometry(f"{WINDOW_WIDTH_COMPACT}x{h}+{wx}+{wy}")
+            
+        button_frame.pack_forget()
+        bottom_frame.pack_forget()
+        
+        win.geometry(f"{WINDOW_WIDTH_COMPACT}x40+{wx}+{wy}")
     win.update()
 
 
@@ -599,7 +575,6 @@ def main():
     dann poll()-Schleife starten und mainloop. Nach quit_app() erkennt poll() tote Fenster und beendet.
     """
     initial_state = {
-        "is_minimal_mode": state["is_minimal_mode"],
         "top_bar_compact": state["top_bar_compact"],
         "transform_text_enabled": state["transform_text_enabled"],
         "current_language": state["current_language"],
@@ -611,7 +586,6 @@ def main():
         "toggle_language": toggle_language,
         "toggle_keyboard": toggle_keyboard,
         "quit_app": quit_app,
-        "toggle_minimal_mode": toggle_minimal_mode,
         "toggle_info_compact": toggle_info_compact,
         "toggle_transform_text": toggle_transform_text,
         "open_api": open_api_dialog,

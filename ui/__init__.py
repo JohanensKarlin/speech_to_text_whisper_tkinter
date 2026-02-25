@@ -6,9 +6,11 @@ from .constants import (
     LABEL_GLAETTEN,
     WINDOW_WIDTH,
     WINDOW_WIDTH_COMPACT,
-    INFO_BTN_COLOR,
-    INFO_BTN_COLOR_ACTIVE,
+    INFO_BTN_BG,
+    INFO_BTN_BG_HOVER,
+    INFO_BTN_TEXT_COLOR,
 )
+
 from .placement import get_dialog_position_beside_parent
 from .window import create_status_window
 
@@ -23,6 +25,7 @@ __all__ = [
     "LABEL_GLAETTEN",
     "WINDOW_WIDTH",
     "WINDOW_WIDTH_COMPACT",
-    "INFO_BTN_COLOR",
-    "INFO_BTN_COLOR_ACTIVE",
+    "INFO_BTN_BG",
+    "INFO_BTN_BG_HOVER",
+    "INFO_BTN_TEXT_COLOR",
 ]

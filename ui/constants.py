@@ -1,9 +1,12 @@
 # UI-Labels and size (no CTk import, for tests and consistency)
 LABEL_SPRACHE = "Language"
 LABEL_GLAETTEN = "Smooth"
-WINDOW_WIDTH = 420
-# Kompakt-Modus (i-Button aktiv): minimale Abstaende; nur Balken, Switch, DE/EN, Switch, i-Button
-WINDOW_WIDTH_COMPACT = 205
-# i-Button: blau wenn inaktiv, hellgrau wenn Kompakt-Modus aktiv
-INFO_BTN_COLOR = "#1E88E5"
-INFO_BTN_COLOR_ACTIVE = "#9E9E9E"
+# Ausgeklappter Modus (i-Button inaktiv): volle Breite mit Labels und Settings
+WINDOW_WIDTH = 330
+# Kompakt-Modus (i-Button aktiv): minimale Abstaende; nur Balken, Switch, Switch, i-Button
+WINDOW_WIDTH_COMPACT = 188
+# i-Button: "inaktiv" (ausgeklappt) = dunkelgrau wie Switch-Hintergrund, "aktiv" (kompakt) = gleicher Hintergrund.
+# Die Textfarbe wird getrennt in window.py gesteuert.
+INFO_BTN_BG = "#4A4D50"
+INFO_BTN_BG_HOVER = "#5C5F62"
+INFO_BTN_TEXT_COLOR = "#1E88E5"
