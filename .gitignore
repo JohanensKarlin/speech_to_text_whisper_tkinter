@@ -37,5 +37,6 @@ Thumbs.db
 venv
 .venv
 
-# Konfigurationsdatei
+# Konfigurationsdateien (API-Key, Benutzereinstellungen)
 config.json
+settings.json

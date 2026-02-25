@@ -1,5 +1,5 @@
 sounddevice==0.4.6
-numpy==1.24.3
+numpy>=1.26.0
 pyperclip==1.8.2
 keyboard==0.13.5
 pyautogui==0.9.54
