@@ -192,9 +192,10 @@ def test_ui_import_and_create_no_display():
         "toggle_keyboard": lambda: None,
         "quit_app": lambda: None,
         "toggle_minimal_mode": lambda: None,
-        "select_microphone": lambda: None,
         "toggle_transform_text": lambda: None,
-        "open_settings": lambda: None,
+        "open_api": lambda: None,
+        "open_smoothing": lambda: None,
+        "open_keys": lambda: None,
     }
     hotkeys = {"start_stop": "ctrl+y", "toggle_language": "alt+l", "toggle_keyboard": "alt+m", "quit": "alt+q"}
     initial = {"is_minimal_mode": True, "transform_text_enabled": False, "current_language": "de"}

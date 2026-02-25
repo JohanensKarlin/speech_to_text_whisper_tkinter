@@ -29,7 +29,6 @@ from config import (
     DEFAULT_HOTKEY_START_STOP,
 )
 from processing import (
-    get_available_microphones,
     record_audio,
     audio_to_wav,
     transcribe,
@@ -37,6 +36,7 @@ from processing import (
 from skill.text_smoothing.prompts import get_prompts
 from ui import (
     create_status_window,
+    get_dialog_position_beside_parent,
     start_wave_animation,
     stop_wave_animation,
     start_reverse_animation,
@@ -72,7 +72,6 @@ state = {
     "keyboard_enabled": True,
     "is_minimal_mode": True,
     "stop_recording_event": threading.Event(),
-    "available_mics": [],
     "client": client,  # OpenAI-Client; wird bei Settings-Speichern (neuer API-Key) ersetzt
     "use_custom_smoother": settings.get(KEY_USE_CUSTOM_SMOOTHER, False),
     "custom_smoother_system": settings.get(KEY_CUSTOM_SMOOTHER_SYSTEM, ""),
@@ -201,7 +200,7 @@ def quit_app():
 
 
 def toggle_minimal_mode():
-    """Fenster zwischen Minimal (nur Leiste) und Normal (mit Start/Stop/Mic/Tastatur/Beenden) umschalten."""
+    """Fenster zwischen Minimal (nur Leiste) und Normal (mit Start/Stop/Mic/...) umschalten. Position bleibt erhalten."""
     win = refs.get("window")
     button_frame = refs.get("button_frame")
     bottom_frame = refs.get("bottom_frame")
@@ -210,59 +209,21 @@ def toggle_minimal_mode():
     if not all([win, button_frame, bottom_frame, content_frame, top_frame]):
         return
     w = WINDOW_WIDTH
+    win.update_idletasks()
+    wx, wy = win.winfo_x(), win.winfo_y()
     if state["is_minimal_mode"]:
         button_frame.pack(pady=2, after=top_frame)
         bottom_frame.pack(pady=2, after=button_frame)
         state["is_minimal_mode"] = False
         win.update_idletasks()
-        win.geometry(f"{w}x120")
+        win.geometry(f"{w}x120+{wx}+{wy}")
     else:
         button_frame.pack_forget()
         bottom_frame.pack_forget()
         state["is_minimal_mode"] = True
         win.update_idletasks()
-        win.geometry(f"{w}x40")
-    sw = win.winfo_screenwidth()
-    sh = win.winfo_screenheight()
-    h = 120 if not state["is_minimal_mode"] else 40
-    win.geometry(f"{w}x{h}+{(sw - w) // 2}+{(sh - h) // 2}")
+        win.geometry(f"{w}x40+{wx}+{wy}")
     win.update()
-
-
-def select_microphone():
-    """Oeffnet Modal-Dialog mit Radiobuttons; gewaehltes Geraet in state["selected_mic_index"]."""
-    import customtkinter as ctk
-    win = refs.get("window")
-    if not state["available_mics"]:
-        state["available_mics"] = get_available_microphones()
-    mic_win = ctk.CTkToplevel(win)
-    mic_win.title("Select microphone")
-    mic_win.geometry("300x250")
-    mic_win.attributes("-topmost", True)
-    sw = mic_win.winfo_screenwidth()
-    sh = mic_win.winfo_screenheight()
-    mic_win.geometry(f"300x250+{(sw - 300) // 2}+{(sh - 250) // 2}")
-    ctk.CTkLabel(mic_win, text="Available microphones:", font=("Arial", 14, "bold")).pack(pady=(15, 5))
-    list_frame = ctk.CTkFrame(mic_win, fg_color="transparent")
-    list_frame.pack(fill="both", expand=True, padx=10, pady=5)
-    scroll = ctk.CTkScrollableFrame(list_frame, width=280, height=150)
-    scroll.pack(fill="both", expand=True)
-    selected_var = ctk.IntVar(value=state["selected_mic_index"])
-    for mic in state["available_mics"]:
-        ctk.CTkRadioButton(
-            scroll, text=mic["name"], value=mic["index"],
-            variable=selected_var, font=("Arial", 12),
-        ).pack(anchor="w", pady=2, padx=5)
-
-    def on_ok():
-        state["selected_mic_index"] = selected_var.get()
-        mic_win.destroy()
-
-    ctk.CTkButton(
-        mic_win, text="OK", command=on_ok,
-        width=100, height=30, corner_radius=10,
-        fg_color="#1E88E5", hover_color="#1976D2",
-    ).pack(pady=15)
 
 
 def toggle_transform_text():
@@ -285,9 +246,8 @@ def open_api_dialog():
     dlg_w, dlg_h = 520, 280
     dlg.geometry(f"{dlg_w}x{dlg_h}")
     dlg.attributes("-topmost", True)
-    sw = dlg.winfo_screenwidth()
-    sh = dlg.winfo_screenheight()
-    dlg.geometry(f"{dlg_w}x{dlg_h}+{(sw - dlg_w) // 2}+{(sh - dlg_h) // 2}")
+    dx, dy = get_dialog_position_beside_parent(win, dlg_w, dlg_h)
+    dlg.geometry(f"{dlg_w}x{dlg_h}+{dx}+{dy}")
 
     px, py_section = 24, 16
     font_label = ("Arial", 12, "bold")
@@ -351,9 +311,8 @@ def open_smoothing_dialog():
     dlg_w, dlg_h = 620, 640
     dlg.geometry(f"{dlg_w}x{dlg_h}")
     dlg.attributes("-topmost", True)
-    sw = dlg.winfo_screenwidth()
-    sh = dlg.winfo_screenheight()
-    dlg.geometry(f"{dlg_w}x{dlg_h}+{(sw - dlg_w) // 2}+{(sh - dlg_h) // 2}")
+    dx, dy = get_dialog_position_beside_parent(win, dlg_w, dlg_h)
+    dlg.geometry(f"{dlg_w}x{dlg_h}+{dx}+{dy}")
 
     scroll = ctk.CTkScrollableFrame(dlg, width=dlg_w - 20, height=dlg_h - 100, fg_color="transparent")
     scroll.pack(fill="both", expand=True, padx=(10, 0), pady=(10, 10))
@@ -440,9 +399,8 @@ def open_keys_dialog():
     dlg_w, dlg_h = 420, 200
     dlg.geometry(f"{dlg_w}x{dlg_h}")
     dlg.attributes("-topmost", True)
-    sw = dlg.winfo_screenwidth()
-    sh = dlg.winfo_screenheight()
-    dlg.geometry(f"{dlg_w}x{dlg_h}+{(sw - dlg_w) // 2}+{(sh - dlg_h) // 2}")
+    dx, dy = get_dialog_position_beside_parent(win, dlg_w, dlg_h)
+    dlg.geometry(f"{dlg_w}x{dlg_h}+{dx}+{dy}")
 
     px, py_section = 24, 14
     font_label = ("Arial", 12, "bold")
@@ -522,7 +480,6 @@ def main():
     Mikrofone laden, Callbacks + initial_state bauen, Fenster erstellen (refs wird befuellt),
     dann poll()-Schleife starten und mainloop. Nach quit_app() erkennt poll() tote Fenster und beendet.
     """
-    state["available_mics"] = get_available_microphones()
     initial_state = {
         "is_minimal_mode": state["is_minimal_mode"],
         "transform_text_enabled": state["transform_text_enabled"],
@@ -536,7 +493,6 @@ def main():
         "toggle_keyboard": toggle_keyboard,
         "quit_app": quit_app,
         "toggle_minimal_mode": toggle_minimal_mode,
-        "select_microphone": select_microphone,
         "toggle_transform_text": toggle_transform_text,
         "open_api": open_api_dialog,
         "open_smoothing": open_smoothing_dialog,

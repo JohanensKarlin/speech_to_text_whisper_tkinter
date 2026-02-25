@@ -152,17 +152,12 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
         corner_radius=10, height=bh, width=bw, fg_color=button_bg, hover_color="#1976D2"
     )
     stop_btn.grid(row=0, column=1, padx=2)
-    mic_btn = ctk.CTkButton(
-        button_frame, text="Mic", command=callbacks["select_microphone"],
-        corner_radius=10, height=bh, width=bw, fg_color=button_bg, hover_color="#1976D2"
-    )
-    mic_btn.grid(row=0, column=2, padx=2)
     kb_initial = "Keyboard: On" if initial_state.get("keyboard_enabled", True) else "Keyboard: Off"
     kb_btn = ctk.CTkButton(
         button_frame, text=kb_initial, command=callbacks["toggle_keyboard"],
         corner_radius=10, height=bh, width=100, fg_color=button_bg, hover_color="#1976D2"
     )
-    kb_btn.grid(row=0, column=3, padx=2)
+    kb_btn.grid(row=0, column=2, padx=2)
 
     # Zeile 2: Smoothing, API, Keys, Quit (links)
     bottom_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
