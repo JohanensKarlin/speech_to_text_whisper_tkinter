@@ -7,6 +7,7 @@
 # =============================================================================
 
 import os
+import sys
 import threading
 import time
 
@@ -51,8 +52,12 @@ from ui import (
 
 # -----------------------------------------------------------------------------
 # Konfiguration: config.json (Default) + settings.json (UI, ueberschreibt)
+# Bei PyInstaller (frozen): App-Verzeichnis = Ordner der .exe (dort config/settings)
 # -----------------------------------------------------------------------------
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    APP_DIR = os.path.dirname(sys.executable)
+else:
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
 config = load_config(APP_DIR)
 settings = load_settings(APP_DIR)
 api_key = (settings.get(KEY_API_KEY) or "").strip() or (config.get("api_key") or "").strip()

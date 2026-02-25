@@ -17,3 +17,6 @@ dependencies = [
     "httpx<0.27",
 ]
 
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0"]
+
