@@ -14,6 +14,12 @@ from .constants import (
     LABEL_GLAETTEN,
     WINDOW_WIDTH,
     WINDOW_WIDTH_COMPACT,
+    WINDOW_HEIGHT_COMPACT,
+    WINDOW_HEIGHT_EXPANDED,
+    ANIM_SCALE,
+    SWITCH_SCALE,
+    INFO_BTN_SCALE,
+    INFO_BTN_FONT_SCALE,
     INFO_BTN_BG,
     INFO_BTN_BG_HOVER,
     INFO_BTN_TEXT_COLOR,
@@ -68,7 +74,7 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     win.title("Speech Recognition")
 
     width = WINDOW_WIDTH
-    height = 40 if is_minimal else 120
+    height = WINDOW_HEIGHT_COMPACT if is_minimal else WINDOW_HEIGHT_EXPANDED
     win.geometry(f"{width}x{height}")
     win.attributes("-topmost", True)
     win.overrideredirect(True)
@@ -88,13 +94,16 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     top_frame.pack(pady=2)
 
     # Animation: 7 Balken auf Canvas; ui.animation steuert Farbwechsel (start/stop von aussen)
+    # Alle Masse mit ANIM_SCALE (Proportionen bleiben gleich)
     anim_frame = ctk.CTkFrame(top_frame, corner_radius=0, fg_color="transparent")
     anim_frame.grid(row=0, column=0, padx=2)
-    heights = [12, 16, 20, 24, 20, 16, 12]
-    cw, ch = 100, 24
+    _base_heights = [12, 16, 20, 24, 20, 16, 12]
+    heights = [max(1, int(h * ANIM_SCALE)) for h in _base_heights]
+    cw = max(20, int(100 * ANIM_SCALE))
+    ch = max(8, int(24 * ANIM_SCALE))
     canvas = ctk.CTkCanvas(anim_frame, width=cw, height=ch, bg="#333333", highlightthickness=0)
     canvas.pack()
-    bar_width, bar_spacing = 6, 6
+    bar_width = bar_spacing = max(1, int(6 * ANIM_SCALE))
     total_bars = (len(heights) * bar_width) + ((len(heights) - 1) * bar_spacing)
     start_x = (cw - total_bars) / 2
     bar_ids = []
@@ -108,42 +117,52 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
         bar_ids.append(bid)
     init_animation(win, canvas, bar_ids)
 
-    # Sprache: Schalter + Anzeige DE/EN (erkennbar im Interface)
+    # Sprache: Schalter + Anzeige DE/EN (erkennbar im Interface); SWITCH_SCALE fuer alle Masse
+    _sw_w, _sw_h = max(20, int(84 * SWITCH_SCALE)), max(14, int(22 * SWITCH_SCALE))
+    _sw_sw, _sw_sh = max(20, int(38 * SWITCH_SCALE)), max(12, int(18 * SWITCH_SCALE))
+    _sw_cr = max(4, int(10 * SWITCH_SCALE))
+    _sw_font = max(8, int(10 * SWITCH_SCALE))
     lang_switch_var = ctk.StringVar(value=lang_label_text)
     lang_switch = ctk.CTkSwitch(
         top_frame, text=LABEL_SPRACHE, command=callbacks["toggle_language"],
         variable=lang_switch_var, onvalue="DE", offvalue="EN",
-        width=84, height=22, switch_width=38, switch_height=18, corner_radius=10,
-        progress_color=button_bg, font=("Arial", 10)
+        width=_sw_w, height=_sw_h, switch_width=_sw_sw, switch_height=_sw_sh, corner_radius=_sw_cr,
+        progress_color=button_bg, font=("Arial", _sw_font)
     )
     lang_switch.grid(row=0, column=1, padx=(6, 4))
     refs["lang_switch_var"] = lang_switch_var
     refs["lang_switch"] = lang_switch
-    lang_label = ctk.CTkLabel(top_frame, text=lang_label_text, font=("Arial", 11, "bold"), text_color="#FFFFFF")
+    _label_font = max(9, int(11 * SWITCH_SCALE))
+    lang_label = ctk.CTkLabel(top_frame, text=lang_label_text, font=("Arial", _label_font, "bold"), text_color="#FFFFFF")
     lang_label.grid(row=0, column=2, padx=4)
 
-    # Vertikaler Trennstrich zwischen Sprache und Glaetten (Hilfe fuer das Auge)
-    sep = ctk.CTkFrame(top_frame, width=2, height=22, fg_color="#FFFFFF", corner_radius=0)
+    # Vertikaler Trennstrich zwischen Sprache und Glaetten (Hilfe fuer das Auge); Hoehe wie Switch
+    sep = ctk.CTkFrame(top_frame, width=2, height=_sw_h, fg_color="#FFFFFF", corner_radius=0)
     sep.grid(row=0, column=3, padx=8, pady=2)
     sep.grid_propagate(False)
 
-    # Text glaetten: Schalter mit erkennbarem Label
+    # Text glaetten: Schalter mit erkennbarem Label (SWITCH_SCALE)
+    _tw = max(20, int(76 * SWITCH_SCALE))
     transform_var = ctk.BooleanVar(value=transform_enabled)
     transform_switch = ctk.CTkSwitch(
         top_frame, text=LABEL_GLAETTEN, variable=transform_var, command=callbacks["toggle_transform_text"],
-        onvalue=True, offvalue=False, width=76, height=22, switch_width=38, switch_height=18,
-        corner_radius=10, progress_color="#00D100", font=("Arial", 10)
+        onvalue=True, offvalue=False, width=_tw, height=_sw_h, switch_width=_sw_sw, switch_height=_sw_sh,
+        corner_radius=_sw_cr, progress_color="#00D100", font=("Arial", _sw_font)
     )
     transform_switch.grid(row=0, column=4, padx=(4, 2))
     refs["transform_text_var"] = transform_var
     refs["transform_switch"] = transform_switch
 
     # Info-Kompakt (nur noch dieser Toggle): Button "i" faehrt Top-Leiste zusammen und versteckt Bottom-Frames.
+    # INFO_BTN_SCALE fuer Kreis, INFO_BTN_FONT_SCALE fuer "i"
+    _ib_sz = max(12, int(18 * INFO_BTN_SCALE))
+    _ib_cr = max(4, int(9 * INFO_BTN_SCALE))
+    _ib_font = max(8, int(11 * INFO_BTN_FONT_SCALE))
     info_btn_fg = INFO_BTN_BG if top_bar_compact else INFO_BTN_BG
     info_btn = ctk.CTkButton(
         top_frame, text="i", command=callbacks["toggle_info_compact"],
-        width=18, height=18, corner_radius=9, fg_color=info_btn_fg, hover_color=INFO_BTN_BG_HOVER, 
-        text_color=INFO_BTN_TEXT_COLOR, font=("Arial", 11, "bold")
+        width=_ib_sz, height=_ib_sz, corner_radius=_ib_cr, fg_color=info_btn_fg, hover_color=INFO_BTN_BG_HOVER,
+        text_color=INFO_BTN_TEXT_COLOR, font=("Arial", _ib_font, "bold")
     )
     info_btn.grid(row=0, column=6, padx=(2, 4))
 
@@ -195,8 +214,8 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     # Kompakt-Modus (i aktiv): nur Switch-Texte "Language"/"Smooth" weg; DE/EN bleibt. sep ausblenden.
     # Minimale Abstaende zwischen den fuenf Elementen (padx/width) fuer kompakte Ansicht.
     if top_bar_compact:
-        lang_switch.configure(text="", width=38)
-        transform_switch.configure(text="", width=38)
+        lang_switch.configure(text="", width=_sw_sw)
+        transform_switch.configure(text="", width=_sw_sw)
         sep.grid_remove()
         lang_label.grid_remove()
         anim_frame.grid_configure(padx=(4, 0))
@@ -206,7 +225,7 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
         top_frame.pack_configure(pady=0)
         win.update_idletasks()
         wx, wy = win.winfo_x(), win.winfo_y()
-        win.geometry(f"{WINDOW_WIDTH_COMPACT}x40+{wx}+{wy}")
+        win.geometry(f"{WINDOW_WIDTH_COMPACT}x{WINDOW_HEIGHT_COMPACT}+{wx}+{wy}")
 
     # Im Kompakt-Modus Frames nicht packen (oder pack_forget), sonst unter top_frame packen (links ausgerichtet)
     if top_bar_compact:

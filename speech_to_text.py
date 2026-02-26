@@ -43,6 +43,9 @@ from ui import (
     start_reverse_animation,
     WINDOW_WIDTH,
     WINDOW_WIDTH_COMPACT,
+    WINDOW_HEIGHT_COMPACT,
+    WINDOW_HEIGHT_EXPANDED,
+    SWITCH_SCALE,
     INFO_BTN_BG,
     INFO_BTN_BG_HOVER,
     INFO_BTN_TEXT_COLOR,
@@ -234,8 +237,10 @@ def toggle_info_compact():
     if state.get("top_bar_compact"):
         # Von Kompakt -> Ausgeklappt
         state["top_bar_compact"] = False
-        lang_switch.configure(text=LABEL_SPRACHE, width=84)
-        transform_switch.configure(text=LABEL_GLAETTEN, width=76)
+        _exp_w_lang = max(20, int(84 * SWITCH_SCALE))
+        _exp_w_transform = max(20, int(76 * SWITCH_SCALE))
+        lang_switch.configure(text=LABEL_SPRACHE, width=_exp_w_lang)
+        transform_switch.configure(text=LABEL_GLAETTEN, width=_exp_w_transform)
         sep.grid(row=0, column=3, padx=8, pady=2)
         lang_label.grid(row=0, column=2, padx=4)
         info_btn.configure(fg_color=INFO_BTN_BG)
@@ -253,12 +258,13 @@ def toggle_info_compact():
         button_frame.pack(pady=2, after=top_frame)
         bottom_frame.pack(pady=2, after=button_frame)
         
-        win.geometry(f"{WINDOW_WIDTH}x120+{wx}+{wy}")
+        win.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT_EXPANDED}+{wx}+{wy}")
     else:
         # Von Ausgeklappt -> Kompakt
         state["top_bar_compact"] = True
-        lang_switch.configure(text="", width=38)
-        transform_switch.configure(text="", width=38)
+        _compact_sw = max(20, int(38 * SWITCH_SCALE))
+        lang_switch.configure(text="", width=_compact_sw)
+        transform_switch.configure(text="", width=_compact_sw)
         sep.grid_remove()
         lang_label.grid_remove()
         info_btn.configure(fg_color=INFO_BTN_BG)
@@ -276,7 +282,7 @@ def toggle_info_compact():
         button_frame.pack_forget()
         bottom_frame.pack_forget()
         
-        win.geometry(f"{WINDOW_WIDTH_COMPACT}x40+{wx}+{wy}")
+        win.geometry(f"{WINDOW_WIDTH_COMPACT}x{WINDOW_HEIGHT_COMPACT}+{wx}+{wy}")
     win.update()
 
 
