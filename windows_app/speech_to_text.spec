@@ -9,10 +9,13 @@
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
 my_datas = [
-    (r'..\.venv\Lib\site-packages\_sounddevice_data\portaudio-binaries\*', '_sounddevice_data/portaudio-binaries')
+    (r'..\.venv\Lib\site-packages\_sounddevice_data\portaudio-binaries\*', '_sounddevice_data/portaudio-binaries'),
+    (r'..\hallucination.json', '.')
 ]
 my_datas += collect_data_files('sounddevice')
 my_datas += collect_data_files('customtkinter')
+my_datas += collect_data_files('certifi')
+my_datas += collect_data_files('httpx')
 
 my_binaries = []
 my_binaries += collect_dynamic_libs('sounddevice')

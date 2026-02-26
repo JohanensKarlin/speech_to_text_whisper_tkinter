@@ -9,6 +9,7 @@
 import json
 import os
 import re
+import sys
 import tempfile
 
 from skill.text_smoothing import smooth_transcription
@@ -16,6 +17,8 @@ from skill.text_smoothing import smooth_transcription
 
 def _load_hallucinations(hallucination_path):
     """Laedt hallucination.json: Dict mit Sprachen als Keys, Listen von Mustern als Values."""
+    if hasattr(sys, '_MEIPASS'):
+        hallucination_path = os.path.join(sys._MEIPASS, "hallucination.json")
     with open(hallucination_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
