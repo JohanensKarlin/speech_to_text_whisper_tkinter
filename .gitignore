@@ -4,6 +4,7 @@ dist/
 
 # PyInstaller-Dateien
 *.spec
+!windows_app/speech_to_text.spec
 
 # Python-Cache-Dateien
 __pycache__/

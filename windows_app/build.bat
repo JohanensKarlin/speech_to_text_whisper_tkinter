@@ -5,15 +5,14 @@ set BUILD_OK=1
 
 where uv >nul 2>&1
 if %errorlevel% equ 0 (
-  echo uv gefunden. PyInstaller nachinstallieren...
-  uv pip install pyinstaller --quiet
-  if errorlevel 1 (
-    echo Fehler: uv pip install pyinstaller fehlgeschlagen.
-    goto :ende
-  )
   echo Build starten...
   uv run pyinstaller --noconfirm --clean "windows_app\speech_to_text.spec"
-  set BUILD_OK=%errorlevel%
+  if errorlevel 1 (
+    echo Fehler: PyInstaller fehlgeschlagen.
+    set BUILD_OK=1
+    goto :ende
+  )
+  set BUILD_OK=0
 ) else (
   set PY=python
   if exist ".venv\Scripts\python.exe" set PY=.venv\Scripts\python.exe
