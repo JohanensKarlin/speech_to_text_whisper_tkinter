@@ -17,6 +17,7 @@ from .constants import (
     WINDOW_HEIGHT_COMPACT,
     WINDOW_HEIGHT_EXPANDED,
     COMPACT_PADY,
+    LOG_AREA_HEIGHT,
     ANIM_SCALE,
     SWITCH_SCALE,
     INFO_BTN_SCALE,
@@ -216,6 +217,14 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     )
     quit_btn.grid(row=0, column=3, padx=2)
 
+    # Log-Bereich (nur ausgeklappt): stdout/stderr wie im Terminal
+    log_frame = ctk.CTkFrame(center_wrapper, corner_radius=6, fg_color="#2a2a2a", border_width=1)
+    log_text = ctk.CTkTextbox(
+        log_frame, height=LOG_AREA_HEIGHT, font=("Consolas", 10), fg_color="#1a1a1a", text_color="#c0c0c0", wrap="word"
+    )
+    log_text.pack(fill="both", expand=True, padx=4, pady=4)
+    log_text.insert("0.0", "[Log] Ausgeklappt: hier erscheint Ausgabe wie im Terminal.\n")
+
     _add_drag(win)
 
     # Kompakt-Modus (i aktiv): nur Switch-Texte "Language"/"Smooth" weg; DE/EN bleibt. sep ausblenden.
@@ -234,13 +243,18 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
         wx, wy = win.winfo_x(), win.winfo_y()
         win.geometry(f"{WINDOW_WIDTH_COMPACT}x{WINDOW_HEIGHT_COMPACT}+{wx}+{wy}")
 
-    # Im Kompakt-Modus nur top_frame in center_wrapper (zentriert); ausgeklappt: top_frame, button_frame, bottom_frame
+    # Im Kompakt-Modus nur top_frame; ausgeklappt: top_frame, button_frame, bottom_frame, log_frame
     if top_bar_compact:
         button_frame.pack_forget()
         bottom_frame.pack_forget()
+        log_frame.pack_forget()
     else:
         button_frame.pack(pady=2, anchor="w")
         bottom_frame.pack(pady=2, anchor="w")
+        log_frame.pack(pady=4, fill="x")
+
+    refs["log_frame"] = log_frame
+    refs["log_text"] = log_text
 
     # Tk-Bindings: hotkeys["start_stop"] -> start_stop_toggle, rest -> jeweiliger Callback
     sk = _tk_bind_key(hotkeys.get("start_stop", "ctrl+y"))

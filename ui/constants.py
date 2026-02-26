@@ -7,8 +7,10 @@ LABEL_GLAETTEN = "Smooth"
 WINDOW_WIDTH = 350
 # Kompakt-Modus (i-Button aktiv): minimale Abstaende; nur Balken, Switch, Switch, i-Button
 WINDOW_WIDTH_COMPACT = 210
-WINDOW_HEIGHT_EXPANDED = 120
+WINDOW_HEIGHT_EXPANDED = 320
 WINDOW_HEIGHT_COMPACT = 40
+# Log-Bereich im ausgeklappten Modus (Hoehe in Pixeln; Fenster vergroessert sich nach unten)
+LOG_AREA_HEIGHT = 160
 # Kompakt: gleicher Abstand oben/unten (zentriert die Zeile vertikal)
 COMPACT_PADY = 8
 

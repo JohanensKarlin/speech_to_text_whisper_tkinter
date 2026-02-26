@@ -7,6 +7,7 @@
 # =============================================================================
 
 import os
+import queue
 import sys
 import threading
 import time
@@ -94,8 +95,11 @@ state = {
     "smoother_model": settings.get(KEY_SMOOTHER_MODEL, DEFAULT_SMOOTHER_MODEL),
 }
 # refs wird von create_status_window() befuellt: window, lang_label, transform_text_var,
-# button_frame, bottom_frame, etc. Callbacks nutzen refs um UI-Elemente zu aktualisieren.
+# button_frame, bottom_frame, log_text, etc. Callbacks nutzen refs um UI-Elemente zu aktualisieren.
 refs = {}
+
+# Queue fuer Log-Ausgabe (stdout/stderr -> Log-Bereich im ausgeklappten Fenster); Haupt-Thread draint
+_log_queue = queue.Queue()
 
 
 def _paste_text(text):
@@ -258,7 +262,9 @@ def toggle_info_compact():
             
         button_frame.pack(pady=2, after=top_frame)
         bottom_frame.pack(pady=2, after=button_frame)
-        
+        log_frame = refs.get("log_frame")
+        if log_frame:
+            log_frame.pack(pady=4, fill="x")
         win.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT_EXPANDED}+{wx}+{wy}")
     else:
         # Von Ausgeklappt -> Kompakt
@@ -282,7 +288,9 @@ def toggle_info_compact():
             
         button_frame.pack_forget()
         bottom_frame.pack_forget()
-        
+        log_frame = refs.get("log_frame")
+        if log_frame:
+            log_frame.pack_forget()
         win.geometry(f"{WINDOW_WIDTH_COMPACT}x{WINDOW_HEIGHT_COMPACT}+{wx}+{wy}")
     win.update()
 
@@ -605,6 +613,49 @@ def main():
         "open_keys": open_keys_dialog,
     }
     create_status_window(callbacks, HOTKEYS, initial_state, refs)
+
+    # Stdout/Stderr in Log-Bereich umleiten (thread-sicher: Queue, Haupt-Thread schreibt ins Widget)
+    class _Tee:
+        def __init__(self, original, name):
+            self._original = original
+            self._name = name
+        def write(self, s):
+            if s:
+                try:
+                    self._original.write(s)
+                    self._original.flush()
+                except Exception:
+                    pass
+                try:
+                    _log_queue.put_nowait(s)
+                except Exception:
+                    pass
+        def flush(self):
+            try:
+                self._original.flush()
+            except Exception:
+                pass
+    sys.stdout = _Tee(sys.__stdout__, "stdout")
+    sys.stderr = _Tee(sys.__stderr__, "stderr")
+
+    def _drain_log_queue():
+        try:
+            log_text = refs.get("log_text")
+            if log_text and log_text.winfo_exists():
+                while True:
+                    try:
+                        s = _log_queue.get_nowait()
+                        log_text.insert("end", s)
+                        log_text.see("end")
+                    except queue.Empty:
+                        break
+        except Exception:
+            pass
+        w = refs.get("window")
+        if w and w.winfo_exists():
+            w.after(200, _drain_log_queue)
+
+    refs["window"].after(200, _drain_log_queue)
     print("Ctrl+Y Start/Stop, Alt+Q Quit.")
 
     def poll():
