@@ -9,6 +9,8 @@ WINDOW_WIDTH = 350
 WINDOW_WIDTH_COMPACT = 210
 WINDOW_HEIGHT_EXPANDED = 120
 WINDOW_HEIGHT_COMPACT = 40
+# Kompakt: gleicher Abstand oben/unten (zentriert die Zeile vertikal)
+COMPACT_PADY = 8
 
 # --- Skalierungs-Multiplikatoren (Proportionen bleiben gleich) ---
 # Balken-Animation: Canvas, Balkenhoehen, bar_width, bar_spacing

@@ -16,6 +16,7 @@ from .constants import (
     WINDOW_WIDTH_COMPACT,
     WINDOW_HEIGHT_COMPACT,
     WINDOW_HEIGHT_EXPANDED,
+    COMPACT_PADY,
     ANIM_SCALE,
     SWITCH_SCALE,
     INFO_BTN_SCALE,
@@ -85,13 +86,19 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     main_frame = ctk.CTkFrame(win, corner_radius=15, fg_color="#333333", border_width=0)
     main_frame.pack(fill="both", expand=True, padx=0, pady=0)
     content_frame = ctk.CTkFrame(main_frame, corner_radius=12, fg_color="#333333", border_width=0)
-    # padx/pady im Kompakt-Modus werden in toggle_info_compact angepasst; Normalbreite behaelt padx=5
+    # Kompakt: padx=0, symmetrisches pady (COMPACT_PADY oben/unten), Top-Zeile zentriert
     compact_padx = 0 if top_bar_compact else 5
-    content_frame.pack(fill="both", expand=True, padx=compact_padx, pady=5)
+    compact_pady = (COMPACT_PADY, COMPACT_PADY) if top_bar_compact else 5
+    content_frame.pack(fill="both", expand=True, padx=compact_padx, pady=compact_pady)
+
+    # Wrapper nimmt volle Breite; top_frame darin zentriert (links/rechts gleich)
+    center_wrapper = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
+    center_wrapper.pack(fill="both", expand=True)
 
     button_bg = "#1E88E5"
-    top_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
-    top_frame.pack(pady=2)
+    top_frame = ctk.CTkFrame(center_wrapper, corner_radius=0, fg_color="transparent")
+    # Kompakt: anchor="center" damit Balken+Switches+i horizontal zentriert; vertikal pady=0
+    top_frame.pack(pady=0 if top_bar_compact else 2, anchor="center" if top_bar_compact else "n")
 
     # Animation: 7 Balken auf Canvas; ui.animation steuert Farbwechsel (start/stop von aussen)
     # Alle Masse mit ANIM_SCALE (Proportionen bleiben gleich)
@@ -167,7 +174,7 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     info_btn.grid(row=0, column=6, padx=(2, 4))
 
     # Zeile 1: Start, Stop, Mic, Keyboard (links)
-    button_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
+    button_frame = ctk.CTkFrame(center_wrapper, corner_radius=0, fg_color="transparent")
     bw, bh = 65, 28
     record_btn = ctk.CTkButton(
         button_frame, text="Start", command=callbacks["start_recording"],
@@ -187,7 +194,7 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     kb_btn.grid(row=0, column=2, padx=2)
 
     # Zeile 2: Smoothing, API, Keys, Quit (links)
-    bottom_frame = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
+    bottom_frame = ctk.CTkFrame(center_wrapper, corner_radius=0, fg_color="transparent")
     smooth_btn = ctk.CTkButton(
         bottom_frame, text="Smoothing", command=callbacks["open_smoothing"],
         corner_radius=10, height=24, width=85, fg_color=button_bg, hover_color="#1976D2"
@@ -222,12 +229,12 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
         lang_switch.grid_configure(padx=(0, 2))
         transform_switch.grid_configure(padx=(0, 6))
         info_btn.grid_configure(padx=(0, 4))
-        top_frame.pack_configure(pady=0)
+        top_frame.pack_configure(pady=0, anchor="center")
         win.update_idletasks()
         wx, wy = win.winfo_x(), win.winfo_y()
         win.geometry(f"{WINDOW_WIDTH_COMPACT}x{WINDOW_HEIGHT_COMPACT}+{wx}+{wy}")
 
-    # Im Kompakt-Modus Frames nicht packen (oder pack_forget), sonst unter top_frame packen (links ausgerichtet)
+    # Im Kompakt-Modus nur top_frame in center_wrapper (zentriert); ausgeklappt: top_frame, button_frame, bottom_frame
     if top_bar_compact:
         button_frame.pack_forget()
         bottom_frame.pack_forget()

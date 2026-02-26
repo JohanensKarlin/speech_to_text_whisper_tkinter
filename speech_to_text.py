@@ -45,6 +45,7 @@ from ui import (
     WINDOW_WIDTH_COMPACT,
     WINDOW_HEIGHT_COMPACT,
     WINDOW_HEIGHT_EXPANDED,
+    COMPACT_PADY,
     SWITCH_SCALE,
     INFO_BTN_BG,
     INFO_BTN_BG_HOVER,
@@ -253,7 +254,7 @@ def toggle_info_compact():
         if content_frame:
             content_frame.pack_configure(padx=5, pady=5)
         if top_frame:
-            top_frame.pack_configure(pady=2)
+            top_frame.pack_configure(pady=2, anchor="n")
             
         button_frame.pack(pady=2, after=top_frame)
         bottom_frame.pack(pady=2, after=button_frame)
@@ -275,9 +276,9 @@ def toggle_info_compact():
         transform_switch.grid_configure(padx=(0, 6))
         info_btn.grid_configure(padx=(0, 4))
         if content_frame:
-            content_frame.pack_configure(padx=0, pady=5)
+            content_frame.pack_configure(padx=0, pady=(COMPACT_PADY, COMPACT_PADY))
         if top_frame:
-            top_frame.pack_configure(pady=0)
+            top_frame.pack_configure(pady=0, anchor="center")
             
         button_frame.pack_forget()
         bottom_frame.pack_forget()
