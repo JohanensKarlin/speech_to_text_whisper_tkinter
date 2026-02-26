@@ -6,6 +6,7 @@
 # transform_text_var, button_frame, etc. befuellt, damit Callbacks die UI updaten.
 # =============================================================================
 
+import sys
 import customtkinter as ctk
 
 from .animation import init_animation
@@ -55,6 +56,31 @@ def _add_drag(window):
     window.bind("<ButtonPress-1>", start_drag)
     window.bind("<B1-Motion>", on_drag)
     window.bind("<ButtonRelease-1>", stop_drag)
+
+
+def _set_taskbar_visible(window):
+    """
+    Fenster in der Windows-Taskleiste anzeigen, damit es unten bei allen Programmen
+    sichtbar ist und per Klick wieder in den Vordergrund geholt werden kann.
+    Nur unter Windows; bei overrideredirect sonst oft nicht in der Taskleiste.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        from ctypes import windll
+        GWL_EXSTYLE = -20
+        WS_EX_APPWINDOW = 0x00040000
+        WS_EX_TOOLWINDOW = 0x00000080
+        hwnd = windll.user32.GetParent(window.winfo_id())
+        if not hwnd:
+            return
+        style = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+        style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
+        windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+        window.wm_withdraw()
+        window.after(10, lambda: window.wm_deiconify())
+    except Exception:
+        pass
 
 
 def create_status_window(callbacks, hotkeys, initial_state, refs):
@@ -283,4 +309,5 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     win.focus_force()
     win.lift()
     win.update()
+    _set_taskbar_visible(win)
     return win
