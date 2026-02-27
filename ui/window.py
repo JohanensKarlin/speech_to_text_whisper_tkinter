@@ -37,8 +37,13 @@ def _tk_bind_key(key_str):
 
 
 def _add_drag(window):
-    """Fenster per Maus ziehen: ButtonPress speichert Offset, B1-Motion setzt geometry."""
+    """Fenster per Maus ziehen: ButtonPress speichert Offset, B1-Motion setzt geometry.
+    Text- und Entry-Widgets werden ausgespart, damit Textauswahl/Kopieren funktioniert."""
+    _no_drag_classes = {"Text", "Entry", "TEntry"}
+
     def start_drag(event):
+        if event.widget.winfo_class() in _no_drag_classes:
+            return
         window._drag_data = {"x": event.x, "y": event.y}
 
     def on_drag(event):

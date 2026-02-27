@@ -8,14 +8,16 @@
 
 import os
 import queue
+import re
 import sys
 import threading
 import time
+from urllib.parse import urlparse, parse_qs
 
 import keyboard
 import pyautogui
 import pyperclip
-from openai import OpenAI
+from openai import OpenAI, AzureOpenAI
 
 from config import (
     load_config,
@@ -29,6 +31,12 @@ from config import (
     DEFAULT_SMOOTHER_MODEL,
     KEY_HOTKEY_START_STOP,
     DEFAULT_HOTKEY_START_STOP,
+    KEY_PROVIDER,
+    KEY_AZURE_ENDPOINT_URL,
+    KEY_AZURE_API_KEY,
+    KEY_TRANSCRIBE_MODEL,
+    DEFAULT_PROVIDER,
+    DEFAULT_TRANSCRIBE_MODEL,
 )
 from processing import (
     record_audio,
@@ -56,6 +64,57 @@ from ui import (
 )
 
 # -----------------------------------------------------------------------------
+# Azure-Hilfsfunktionen
+# -----------------------------------------------------------------------------
+def _parse_azure_endpoint(full_url):
+    """
+    Parst die vollstaendige Azure-Endpoint-URL.
+    Gibt (base_url, deployment_name, api_version) zurueck.
+    Beispiel: https://foo.cognitiveservices.azure.com/openai/deployments/gpt-4o-mini-transcribe/audio/transcriptions?api-version=2025-03-01-preview
+    -> ("https://foo.cognitiveservices.azure.com", "gpt-4o-mini-transcribe", "2025-03-01-preview")
+    """
+    if not full_url:
+        return "", "", "2025-03-01-preview"
+    try:
+        parsed = urlparse(full_url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        match = re.search(r"/deployments/([^/]+)", parsed.path)
+        deployment = match.group(1) if match else ""
+        qs = parse_qs(parsed.query)
+        api_version = qs.get("api-version", ["2025-03-01-preview"])[0]
+        return base, deployment, api_version
+    except Exception:
+        return "", "", "2025-03-01-preview"
+
+
+def _build_client(settings_data, config_data):
+    """Erstellt OpenAI- oder AzureOpenAI-Client je nach Provider in settings_data."""
+    provider = (settings_data.get(KEY_PROVIDER) or DEFAULT_PROVIDER).strip().lower()
+    if provider == "azure":
+        endpoint_url = settings_data.get(KEY_AZURE_ENDPOINT_URL, "")
+        azure_key = (settings_data.get(KEY_AZURE_API_KEY) or "").strip()
+        base_url, _, api_version = _parse_azure_endpoint(endpoint_url)
+        return AzureOpenAI(
+            api_key=azure_key or "dummy",
+            azure_endpoint=base_url or "https://dummy.cognitiveservices.azure.com",
+            api_version=api_version,
+        )
+    else:
+        api_key = (settings_data.get(KEY_API_KEY) or "").strip() or (config_data.get("api_key") or "").strip()
+        return OpenAI(api_key=api_key or "dummy")
+
+
+def _get_transcribe_model(settings_data):
+    """Liefert das Transkriptionsmodell: bei Azure aus der Endpoint-URL, sonst aus settings."""
+    provider = (settings_data.get(KEY_PROVIDER) or DEFAULT_PROVIDER).strip().lower()
+    if provider == "azure":
+        endpoint_url = settings_data.get(KEY_AZURE_ENDPOINT_URL, "")
+        _, deployment, _ = _parse_azure_endpoint(endpoint_url)
+        return deployment or DEFAULT_TRANSCRIBE_MODEL
+    return (settings_data.get(KEY_TRANSCRIBE_MODEL) or "").strip() or DEFAULT_TRANSCRIBE_MODEL
+
+
+# -----------------------------------------------------------------------------
 # Konfiguration: config.json (Default) + settings.json (UI, ueberschreibt)
 # Bei PyInstaller (frozen): App-Verzeichnis = Ordner der .exe (dort config/settings)
 # -----------------------------------------------------------------------------
@@ -65,8 +124,7 @@ else:
     APP_DIR = os.path.dirname(os.path.abspath(__file__))
 config = load_config(APP_DIR)
 settings = load_settings(APP_DIR)
-api_key = (settings.get(KEY_API_KEY) or "").strip() or (config.get("api_key") or "").strip()
-client = OpenAI(api_key=api_key or "dummy")
+client = _build_client(settings, config)
 
 # Tastatur-Shortcuts: Keys wie sie von keyboard.is_pressed geprueft werden.
 # start_stop aus settings.json, Rest fest.
@@ -88,11 +146,15 @@ state = {
     "keyboard_enabled": True,
     "top_bar_compact": True,
     "stop_recording_event": threading.Event(),
-    "client": client,  # OpenAI-Client; wird bei Settings-Speichern (neuer API-Key) ersetzt
+    "client": client,  # OpenAI- oder AzureOpenAI-Client; wird bei Settings-Speichern ersetzt
     "use_custom_smoother": settings.get(KEY_USE_CUSTOM_SMOOTHER, False),
     "custom_smoother_system": settings.get(KEY_CUSTOM_SMOOTHER_SYSTEM, ""),
     "custom_smoother_user": settings.get(KEY_CUSTOM_SMOOTHER_USER, ""),
     "smoother_model": settings.get(KEY_SMOOTHER_MODEL, DEFAULT_SMOOTHER_MODEL),
+    "provider": settings.get(KEY_PROVIDER, DEFAULT_PROVIDER),
+    "azure_endpoint_url": settings.get(KEY_AZURE_ENDPOINT_URL, ""),
+    "azure_api_key": settings.get(KEY_AZURE_API_KEY, ""),
+    "transcribe_model": _get_transcribe_model(settings),
 }
 # refs wird von create_status_window() befuellt: window, lang_label, transform_text_var,
 # button_frame, bottom_frame, log_text, etc. Callbacks nutzen refs um UI-Elemente zu aktualisieren.
@@ -144,6 +206,7 @@ def process_recording():
             language=state["current_language"],
             hallucination_path=hallucination_path,
             transform_enabled=transform_enabled,
+            model_transcribe=state.get("transcribe_model") or DEFAULT_TRANSCRIBE_MODEL,
             custom_smoother_system=custom_sys,
             custom_smoother_user=custom_usr,
             smoother_model=state.get("smoother_model") or DEFAULT_SMOOTHER_MODEL,
@@ -303,14 +366,16 @@ def toggle_transform_text():
 
 def open_api_dialog():
     """
-    API-Dialog: API-Key anzeigen/eingeben/speichern, Modell fuer Smoother waehlen.
-    Speichert in settings.json. Bei neuem Key wird state["client"] aktualisiert.
+    API-Dialog: Provider (OpenAI / Azure) waehlen, Zugangsdaten und Modelle konfigurieren.
+    OpenAI: API-Key, Transkriptionsmodell, Glaettungsmodell.
+    Azure: vollstaendige Endpoint-URL (Transkriptionsmodell wird daraus geparst), API-Key, Glaettungsmodell.
+    Speichert in settings.json und aktualisiert state["client"] sofort.
     """
     import customtkinter as ctk
     win = refs.get("window")
     if not win:
         return
-        
+
     existing_dlg = refs.get("dlg_api")
     if existing_dlg and existing_dlg.winfo_exists():
         existing_dlg.destroy()
@@ -319,59 +384,132 @@ def open_api_dialog():
 
     dlg = ctk.CTkToplevel(win)
     refs["dlg_api"] = dlg
-    
+
     def on_close():
         refs["dlg_api"] = None
         dlg.destroy()
     dlg.protocol("WM_DELETE_WINDOW", on_close)
 
     dlg.title("API")
-    dlg_w, dlg_h = 520, 280
-    dlg.geometry(f"{dlg_w}x{dlg_h}")
+    dlg_w, dlg_h = 520, 460
     dlg.attributes("-topmost", True)
     dx, dy = get_dialog_position_beside_parent(win, dlg_w, dlg_h)
     dlg.geometry(f"{dlg_w}x{dlg_h}+{dx}+{dy}")
 
-    px, py_section = 24, 16
+    px, py_section = 24, 12
     font_label = ("Arial", 12, "bold")
     font_body = ("Arial", 11)
     entry_w = 460
 
-    # API Key
-    ctk.CTkLabel(dlg, text="API Key (OpenAI):", font=font_label).pack(anchor="w", padx=px, pady=(py_section, 6))
-    api_entry = ctk.CTkEntry(
-        dlg, width=entry_w, height=36, font=font_body, show="*",
+    saved = load_settings(APP_DIR)
+
+    # --- Provider-Auswahl ---
+    ctk.CTkLabel(dlg, text="Provider:", font=font_label).pack(anchor="w", padx=px, pady=(py_section, 4))
+    provider_var = ctk.StringVar(value=saved.get(KEY_PROVIDER, DEFAULT_PROVIDER))
+    provider_seg = ctk.CTkSegmentedButton(
+        dlg, values=["openai", "azure"], variable=provider_var,
+        width=200, height=32, font=font_body,
+    )
+    provider_seg.pack(anchor="w", padx=px, pady=(0, py_section))
+
+    # --- OpenAI-Bereich ---
+    openai_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+
+    ctk.CTkLabel(openai_frame, text="API Key (OpenAI):", font=font_label).pack(anchor="w", padx=0, pady=(0, 4))
+    oai_key_entry = ctk.CTkEntry(
+        openai_frame, width=entry_w, height=34, font=font_body, show="*",
         placeholder_text="Leer = config.json oder bestehende Einstellungen"
     )
-    api_entry.pack(padx=px, pady=(0, 6))
-    api_entry.insert(0, load_settings(APP_DIR).get(KEY_API_KEY, ""))
+    oai_key_entry.pack(pady=(0, 4))
+    oai_key_entry.insert(0, saved.get(KEY_API_KEY, ""))
 
-    def toggle_show():
-        if api_entry.cget("show") == "*":
-            api_entry.configure(show="")
+    def _toggle_oai_show():
+        oai_key_entry.configure(show="" if oai_key_entry.cget("show") == "*" else "*")
+    ctk.CTkButton(openai_frame, text="Anzeigen", width=100, height=26, font=font_body,
+                  command=_toggle_oai_show).pack(anchor="w", pady=(0, py_section))
+
+    ctk.CTkLabel(openai_frame, text="Modell (Spracherkennung):", font=font_label).pack(anchor="w", pady=(0, 4))
+    transcribe_models = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"]
+    cur_transcribe = saved.get(KEY_TRANSCRIBE_MODEL, DEFAULT_TRANSCRIBE_MODEL)
+    if cur_transcribe not in transcribe_models:
+        transcribe_models = [cur_transcribe] + transcribe_models
+    transcribe_var = ctk.StringVar(value=cur_transcribe)
+    ctk.CTkComboBox(openai_frame, values=transcribe_models, variable=transcribe_var,
+                    width=320, height=34, font=font_body).pack(anchor="w", pady=(0, py_section))
+
+    # --- Azure-Bereich ---
+    azure_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+
+    ctk.CTkLabel(azure_frame, text="Endpoint URL (vollstaendig):", font=font_label).pack(anchor="w", padx=0, pady=(0, 4))
+    az_endpoint_entry = ctk.CTkEntry(
+        azure_frame, width=entry_w, height=34, font=("Consolas", 10),
+        placeholder_text="https://<name>.cognitiveservices.azure.com/openai/deployments/..."
+    )
+    az_endpoint_entry.pack(pady=(0, 4))
+    az_endpoint_entry.insert(0, saved.get(KEY_AZURE_ENDPOINT_URL, ""))
+
+    ctk.CTkLabel(azure_frame, text="API Key (Azure):", font=font_label).pack(anchor="w", pady=(0, 4))
+    az_key_entry = ctk.CTkEntry(
+        azure_frame, width=entry_w, height=34, font=font_body, show="*",
+        placeholder_text="Azure API Key"
+    )
+    az_key_entry.pack(pady=(0, 4))
+    az_key_entry.insert(0, saved.get(KEY_AZURE_API_KEY, ""))
+
+    def _toggle_az_show():
+        az_key_entry.configure(show="" if az_key_entry.cget("show") == "*" else "*")
+    ctk.CTkButton(azure_frame, text="Anzeigen", width=100, height=26, font=font_body,
+                  command=_toggle_az_show).pack(anchor="w", pady=(0, py_section))
+
+    # --- Gemeinsam: Glaettungsmodell ---
+    smoother_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+    ctk.CTkLabel(smoother_frame, text="Modell (Text-Glaettung):", font=font_label).pack(anchor="w", padx=0, pady=(0, 4))
+    smoother_models = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
+    cur_smoother = state.get("smoother_model", DEFAULT_SMOOTHER_MODEL)
+    if cur_smoother not in smoother_models:
+        smoother_models = [cur_smoother] + smoother_models
+    smoother_var = ctk.StringVar(value=cur_smoother)
+    ctk.CTkComboBox(smoother_frame, values=smoother_models, variable=smoother_var,
+                    width=320, height=34, font=font_body).pack(anchor="w", pady=(0, 4))
+
+    # --- Provider-Switch: Sektionen ein-/ausblenden ---
+    def _on_provider_change(val=None):
+        p = provider_var.get()
+        if p == "azure":
+            openai_frame.pack_forget()
+            azure_frame.pack(anchor="w", padx=px, fill="x")
         else:
-            api_entry.configure(show="*")
-    ctk.CTkButton(dlg, text="Anzeigen", width=100, height=28, font=font_body, command=toggle_show).pack(anchor="w", padx=px, pady=(0, py_section))
+            azure_frame.pack_forget()
+            openai_frame.pack(anchor="w", padx=px, fill="x")
+        smoother_frame.pack(anchor="w", padx=px, fill="x", pady=(0, 4))
 
-    # Modell (Smoother / Chat-Completion)
-    ctk.CTkLabel(dlg, text="Modell (Text-Glaettung):", font=font_label).pack(anchor="w", padx=px, pady=(0, 6))
-    smoother_models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
-    current_model = state.get("smoother_model", DEFAULT_SMOOTHER_MODEL)
-    if current_model and current_model not in smoother_models:
-        smoother_models = [current_model] + smoother_models
-    model_var = ctk.StringVar(value=current_model)
-    model_combo = ctk.CTkComboBox(dlg, values=smoother_models, variable=model_var, width=320, height=36, font=font_body)
-    model_combo.pack(anchor="w", padx=px, pady=(0, py_section))
+    provider_seg.configure(command=_on_provider_change)
+    _on_provider_change()
 
+    # --- Speichern ---
     def on_save():
-        new_key = (api_entry.get() or "").strip()
-        smoother_model = (model_var.get() or "").strip() or DEFAULT_SMOOTHER_MODEL
+        provider = provider_var.get()
+        smoother_model = (smoother_var.get() or "").strip() or DEFAULT_SMOOTHER_MODEL
         data = load_settings(APP_DIR)
-        data[KEY_API_KEY] = new_key
+        data[KEY_PROVIDER] = provider
         data[KEY_SMOOTHER_MODEL] = smoother_model
+        if provider == "openai":
+            data[KEY_API_KEY] = (oai_key_entry.get() or "").strip()
+            data[KEY_TRANSCRIBE_MODEL] = (transcribe_var.get() or "").strip() or DEFAULT_TRANSCRIBE_MODEL
+        else:
+            data[KEY_AZURE_ENDPOINT_URL] = (az_endpoint_entry.get() or "").strip()
+            data[KEY_AZURE_API_KEY] = (az_key_entry.get() or "").strip()
         save_settings(APP_DIR, data)
+        state["provider"] = provider
         state["smoother_model"] = smoother_model
-        state["client"] = OpenAI(api_key=new_key or (load_config(APP_DIR).get("api_key") or "").strip() or "dummy")
+        state["client"] = _build_client(data, load_config(APP_DIR))
+        state["transcribe_model"] = _get_transcribe_model(data)
+        if provider == "openai":
+            state["azure_endpoint_url"] = data.get(KEY_AZURE_ENDPOINT_URL, "")
+            state["azure_api_key"] = data.get(KEY_AZURE_API_KEY, "")
+        else:
+            state["azure_endpoint_url"] = data.get(KEY_AZURE_ENDPOINT_URL, "")
+            state["azure_api_key"] = data.get(KEY_AZURE_API_KEY, "")
         refs["dlg_api"] = None
         dlg.destroy()
 

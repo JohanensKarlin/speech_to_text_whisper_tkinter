@@ -1,19 +1,20 @@
 # =============================================================================
 # UI/ANIMATION.PY – Wellen-Animation (Aufnahme / Transkription)
 # =============================================================================
-# Modul-State: _window, _canvas, _bar_ids (von init_animation gesetzt). Animation
-# laeuft ueber window.after(150, ...) in Schleife. start_wave = links-nach-rechts,
-# start_reverse = rechts-nach-links. Aufrufer: speech_to_text.process_recording.
+# Thread-sicher: start/stop koennen aus Hintergrund-Threads aufgerufen werden.
+# Alle Canvas-Operationen laufen im Haupt-Thread via window.after(0, ...).
+# _generation invalidiert veraltete after-Callbacks bei Richtungswechsel/Stop.
 # =============================================================================
 
 _bar_ids = []
 _canvas = None
 _window = None
 _running = False
-_after_id = None
+_mode = "idle"   # "wave" | "reverse" | "idle"
+_generation = 0
 
-# Farbfolge fuer die Balken (dunkel -> hell)
 COLORS = ["#555555", "#777777", "#999999", "#BBBBBB", "#DDDDDD", "#FFFFFF"]
+_COLOR_IDLE = "#555555"
 
 
 def init_animation(window, canvas, bar_ids):
@@ -24,55 +25,64 @@ def init_animation(window, canvas, bar_ids):
     _bar_ids = bar_ids
 
 
-def _run_wave(step):
-    """Ein Frame: Balken i bekommt Farbe (step+i) % len(COLORS); naechster Aufruf in 150 ms."""
-    global _running, _after_id
-    if not _running or not _window or not _canvas or not _bar_ids:
+def _run_frame(step, gen):
+    """
+    Ein Frame der Animation – laeuft immer im Haupt-Thread (nur via window.after geplant).
+    gen: Generation-Zaehler. Veraltete Callbacks (nach stop/restart) erkennen gen != _generation
+    und brechen sofort ab, ohne weiteren after zu planen.
+    """
+    if gen != _generation or not _running or _mode == "idle":
+        return
+    if not _window or not _canvas or not _bar_ids:
         return
     n = len(_bar_ids)
     for i in range(n):
-        pos = (step + i) % len(COLORS)
+        if _mode == "wave":
+            pos = (step + i) % len(COLORS)
+        else:
+            pos = (step + (n - 1 - i)) % len(COLORS)
         _canvas.itemconfig(_bar_ids[i], fill=COLORS[pos])
-    _after_id = _window.after(150, _run_wave, (step + 1) % len(COLORS))
+    _window.after(150, _run_frame, (step + 1) % len(COLORS), gen)
 
 
-def _run_reverse(step):
-    """Wie _run_wave, aber Laufrichtung rechts-nach-links (Index n-1-i)."""
-    global _running, _after_id
-    if not _running or not _window or not _canvas or not _bar_ids:
-        return
-    n = len(_bar_ids)
-    for i in range(n):
-        pos = (step + (n - 1 - i)) % len(COLORS)
-        _canvas.itemconfig(_bar_ids[i], fill=COLORS[pos])
-    _after_id = _window.after(150, _run_reverse, (step + 1) % len(COLORS))
+def _reset_bars_on_main():
+    """Setzt alle Balken auf Ruhefarbe. Nur im Haupt-Thread (via after) aufrufen."""
+    if _canvas and _bar_ids:
+        for bid in _bar_ids:
+            _canvas.itemconfig(bid, fill=_COLOR_IDLE)
 
 
 def start_wave_animation():
-    """Startet Wellen-Animation (Aufnahme). Idempotent: wenn schon _running, kein neuer after."""
-    global _running, _after_id
-    if _running:
+    """Thread-sicher. Startet Wellen-Animation links-nach-rechts (Aufnahme laeuft)."""
+    global _running, _mode, _generation
+    if _running and _mode == "wave":
         return
     _running = True
-    _run_wave(0)
+    _mode = "wave"
+    _generation += 1
+    g = _generation
+    if _window:
+        _window.after(0, lambda: _run_frame(0, g))
 
 
 def stop_wave_animation():
-    """Stoppt Animation, cancelt pending after, setzt alle Balken auf Ruhefarbe."""
-    global _running, _after_id
+    """Thread-sicher. Stoppt Animation sofort, setzt Balken auf Ruhefarbe."""
+    global _running, _mode, _generation
     _running = False
-    if _window and _after_id is not None:
-        _window.after_cancel(_after_id)
-        _after_id = None
-    if _canvas and _bar_ids:
-        for bid in _bar_ids:
-            _canvas.itemconfig(bid, fill="#555555")
+    _mode = "idle"
+    _generation += 1
+    if _window:
+        _window.after(0, _reset_bars_on_main)
 
 
 def start_reverse_animation():
-    """Startet Rueckwaerts-Animation (Transkription laeuft). Idempotent wie start_wave."""
-    global _running
-    if _running:
+    """Thread-sicher. Startet Rueckwaerts-Animation rechts-nach-links (Transkription laeuft)."""
+    global _running, _mode, _generation
+    if _running and _mode == "reverse":
         return
     _running = True
-    _run_reverse(0)
+    _mode = "reverse"
+    _generation += 1
+    g = _generation
+    if _window:
+        _window.after(0, lambda: _run_frame(0, g))

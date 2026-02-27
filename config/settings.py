@@ -17,9 +17,15 @@ KEY_CUSTOM_SMOOTHER_SYSTEM = "custom_smoother_system"
 KEY_CUSTOM_SMOOTHER_USER = "custom_smoother_user"
 KEY_SMOOTHER_MODEL = "smoother_model"
 KEY_HOTKEY_START_STOP = "hotkey_start_stop"
+KEY_PROVIDER = "provider"
+KEY_AZURE_ENDPOINT_URL = "azure_endpoint_url"
+KEY_AZURE_API_KEY = "azure_api_key"
+KEY_TRANSCRIBE_MODEL = "transcribe_model"
 
 DEFAULT_SMOOTHER_MODEL = "gpt-4o-mini"
 DEFAULT_HOTKEY_START_STOP = "ctrl+y"
+DEFAULT_PROVIDER = "openai"
+DEFAULT_TRANSCRIBE_MODEL = "gpt-4o-mini-transcribe"
 
 
 def _path(app_dir):
@@ -46,6 +52,10 @@ def load_settings(app_dir):
         KEY_CUSTOM_SMOOTHER_USER: (data.get(KEY_CUSTOM_SMOOTHER_USER) or "").strip(),
         KEY_SMOOTHER_MODEL: (data.get(KEY_SMOOTHER_MODEL) or "").strip() or DEFAULT_SMOOTHER_MODEL,
         KEY_HOTKEY_START_STOP: (data.get(KEY_HOTKEY_START_STOP) or "").strip().lower().replace("strg", "ctrl") or DEFAULT_HOTKEY_START_STOP,
+        KEY_PROVIDER: (data.get(KEY_PROVIDER) or DEFAULT_PROVIDER).strip().lower(),
+        KEY_AZURE_ENDPOINT_URL: (data.get(KEY_AZURE_ENDPOINT_URL) or "").strip(),
+        KEY_AZURE_API_KEY: (data.get(KEY_AZURE_API_KEY) or "").strip(),
+        KEY_TRANSCRIBE_MODEL: (data.get(KEY_TRANSCRIBE_MODEL) or "").strip() or DEFAULT_TRANSCRIBE_MODEL,
     }
 
 
@@ -61,6 +71,10 @@ def save_settings(app_dir, data):
         KEY_CUSTOM_SMOOTHER_USER: (data.get(KEY_CUSTOM_SMOOTHER_USER) or ""),
         KEY_SMOOTHER_MODEL: (data.get(KEY_SMOOTHER_MODEL) or "").strip() or DEFAULT_SMOOTHER_MODEL,
         KEY_HOTKEY_START_STOP: (data.get(KEY_HOTKEY_START_STOP) or "").strip().lower().replace("strg", "ctrl") or DEFAULT_HOTKEY_START_STOP,
+        KEY_PROVIDER: (data.get(KEY_PROVIDER) or DEFAULT_PROVIDER).strip().lower(),
+        KEY_AZURE_ENDPOINT_URL: (data.get(KEY_AZURE_ENDPOINT_URL) or "").strip(),
+        KEY_AZURE_API_KEY: (data.get(KEY_AZURE_API_KEY) or "").strip(),
+        KEY_TRANSCRIBE_MODEL: (data.get(KEY_TRANSCRIBE_MODEL) or "").strip() or DEFAULT_TRANSCRIBE_MODEL,
     }
     with open(p, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2, ensure_ascii=False)
