@@ -19,33 +19,25 @@ def _create_chat_bubble(parent, text, bubble_type="system"):
     bubble_type: "transcript" (blau) oder "error" (rot)
     """
     bubble_colors = {
-        "transcript": {"bg": "#1E88E5", "text": "#FFFFFF", "label": "Ergebnis"},
-        "error": {"bg": "#E53935", "text": "#FFFFFF", "label": "Fehler"},
+        "transcript": {"bg": "#1E88E5", "text": "#FFFFFF"},
+        "error": {"bg": "#E53935", "text": "#FFFFFF"},
     }
     if bubble_type not in bubble_colors:
         return None
     colors = bubble_colors[bubble_type]
+    original_color = colors["bg"]
 
     bubble_frame = ctk.CTkFrame(
         parent, corner_radius=8, fg_color=colors["bg"], border_width=0
     )
 
-    header_frame = ctk.CTkFrame(bubble_frame, corner_radius=0, fg_color="transparent")
-    header_frame.pack(fill="x", padx=8, pady=(6, 2))
-
-    label = ctk.CTkLabel(
-        header_frame,
-        text=colors["label"],
-        font=("Arial", 9, "bold"),
-        text_color=colors["text"],
-    )
-    label.pack(side="left")
-
     def copy_text():
         pyperclip.copy(text)
+        bubble_frame.configure(fg_color="#2E7D32")
+        bubble_frame.after(300, lambda: bubble_frame.configure(fg_color=original_color))
 
     copy_btn = ctk.CTkButton(
-        header_frame,
+        bubble_frame,
         text="Copy",
         command=copy_text,
         width=50,
@@ -55,7 +47,7 @@ def _create_chat_bubble(parent, text, bubble_type="system"):
         hover_color="#666666",
         font=("Arial", 8),
     )
-    copy_btn.pack(side="right")
+    copy_btn.pack(side="bottom", anchor="se", padx=4, pady=4)
 
     text_label = ctk.CTkLabel(
         bubble_frame,
@@ -65,7 +57,7 @@ def _create_chat_bubble(parent, text, bubble_type="system"):
         wraplength=280,
         justify="left",
     )
-    text_label.pack(fill="x", padx=8, pady=(0, 6))
+    text_label.pack(fill="x", padx=8, pady=(6, 0))
 
     return bubble_frame
 

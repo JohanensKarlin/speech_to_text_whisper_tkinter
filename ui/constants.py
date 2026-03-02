@@ -10,7 +10,7 @@ WINDOW_WIDTH_COMPACT = 210
 WINDOW_HEIGHT_EXPANDED = 365
 WINDOW_HEIGHT_COMPACT = 40
 # Log-Bereich im ausgeklappten Modus (Hoehe in Pixeln; Fenster vergroessert sich nach unten)
-LOG_AREA_HEIGHT = 200
+LOG_AREA_HEIGHT = 230
 # Kompakt: gleicher Abstand oben/unten (zentriert die Zeile vertikal)
 COMPACT_PADY = 8
 
