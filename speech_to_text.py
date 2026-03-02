@@ -63,6 +63,7 @@ from ui import (
     LABEL_GLAETTEN,
 )
 
+
 # -----------------------------------------------------------------------------
 # Azure-Hilfsfunktionen
 # -----------------------------------------------------------------------------
@@ -100,7 +101,9 @@ def _build_client(settings_data, config_data):
             api_version=api_version,
         )
     else:
-        api_key = (settings_data.get(KEY_API_KEY) or "").strip() or (config_data.get("api_key") or "").strip()
+        api_key = (settings_data.get(KEY_API_KEY) or "").strip() or (
+            config_data.get("api_key") or ""
+        ).strip()
         return OpenAI(api_key=api_key or "dummy")
 
 
@@ -111,7 +114,9 @@ def _get_transcribe_model(settings_data):
         endpoint_url = settings_data.get(KEY_AZURE_ENDPOINT_URL, "")
         _, deployment, _ = _parse_azure_endpoint(endpoint_url)
         return deployment or DEFAULT_TRANSCRIBE_MODEL
-    return (settings_data.get(KEY_TRANSCRIBE_MODEL) or "").strip() or DEFAULT_TRANSCRIBE_MODEL
+    return (
+        settings_data.get(KEY_TRANSCRIBE_MODEL) or ""
+    ).strip() or DEFAULT_TRANSCRIBE_MODEL
 
 
 # -----------------------------------------------------------------------------
@@ -129,7 +134,11 @@ client = _build_client(settings, config)
 # Tastatur-Shortcuts: Keys wie sie von keyboard.is_pressed geprueft werden.
 # start_stop aus settings.json, Rest fest.
 HOTKEYS = {
-    "start_stop": (settings.get(KEY_HOTKEY_START_STOP) or "").strip().lower().replace("strg", "ctrl") or DEFAULT_HOTKEY_START_STOP,
+    "start_stop": (settings.get(KEY_HOTKEY_START_STOP) or "")
+    .strip()
+    .lower()
+    .replace("strg", "ctrl")
+    or DEFAULT_HOTKEY_START_STOP,
     "toggle_language": "alt+l",
     "toggle_keyboard": "alt+m",
     "quit": "alt+q",
@@ -164,6 +173,21 @@ refs = {}
 _log_queue = queue.Queue()
 
 
+def _log_to_chat(text, bubble_type="system"):
+    """
+    Loggt text als ChatBubble (im UI) und in Terminal.
+    bubble_type: "transcript" (blau) oder "error" (rot).
+    """
+    print(text)
+
+    add_bubble = refs.get("add_chat_bubble")
+    if add_bubble and bubble_type in ("transcript", "error"):
+        try:
+            add_bubble(text, bubble_type)
+        except Exception:
+            pass
+
+
 def _paste_text(text):
     """Text in Zwischenablage und per Strg+V einfügen (aktivem Fenster)."""
     if text:
@@ -190,14 +214,18 @@ def process_recording():
         )
         stop_wave_animation()
         if audio_data.size == 0:
-            print("Keine Audiodaten aufgenommen.")
+            _log_to_chat("Keine Audiodaten aufgenommen.", "error")
             return
         start_reverse_animation()
         wav_file = audio_to_wav(audio_data)
         hallucination_path = os.path.join(APP_DIR, "hallucination.json")
         transform_var = refs.get("transform_text_var")
         transform_enabled = transform_var.get() if transform_var else False
-        use_custom = state.get("use_custom_smoother") and state.get("custom_smoother_system") and state.get("custom_smoother_user")
+        use_custom = (
+            state.get("use_custom_smoother")
+            and state.get("custom_smoother_system")
+            and state.get("custom_smoother_user")
+        )
         custom_sys = state.get("custom_smoother_system") if use_custom else None
         custom_usr = state.get("custom_smoother_user") if use_custom else None
         text = transcribe(
@@ -214,11 +242,11 @@ def process_recording():
         stop_wave_animation()
         if text:
             _paste_text(text)
-            print(f"Transkription abgeschlossen: {text}")
+            _log_to_chat(text, "transcript")
         else:
-            print("Transkription ergab keinen Text.")
+            _log_to_chat("Transkription ergab keinen Text.", "error")
     except Exception as e:
-        print(f"Fehler: {e}")
+        _log_to_chat(f"Fehler: {e}", "error")
         stop_wave_animation()
     finally:
         state["is_recording"] = False
@@ -295,13 +323,24 @@ def toggle_info_compact():
     bottom_frame = refs.get("bottom_frame")
     content_frame = refs.get("content_frame")
     top_frame = refs.get("top_frame")
-    
-    if not all([win, lang_switch, lang_label, transform_switch, sep, info_btn, button_frame, bottom_frame]):
+
+    if not all(
+        [
+            win,
+            lang_switch,
+            lang_label,
+            transform_switch,
+            sep,
+            info_btn,
+            button_frame,
+            bottom_frame,
+        ]
+    ):
         return
-        
+
     win.update_idletasks()
     wx, wy = win.winfo_x(), win.winfo_y()
-    
+
     if state.get("top_bar_compact"):
         # Von Kompakt -> Ausgeklappt
         state["top_bar_compact"] = False
@@ -322,7 +361,7 @@ def toggle_info_compact():
             content_frame.pack_configure(padx=5, pady=5)
         if top_frame:
             top_frame.pack_configure(pady=2, anchor="n")
-            
+
         button_frame.pack(pady=2, after=top_frame)
         bottom_frame.pack(pady=2, after=button_frame)
         log_frame = refs.get("log_frame")
@@ -348,7 +387,7 @@ def toggle_info_compact():
             content_frame.pack_configure(padx=0, pady=(COMPACT_PADY, COMPACT_PADY))
         if top_frame:
             top_frame.pack_configure(pady=0, anchor="center")
-            
+
         button_frame.pack_forget()
         bottom_frame.pack_forget()
         log_frame = refs.get("log_frame")
@@ -372,6 +411,7 @@ def open_api_dialog():
     Speichert in settings.json und aktualisiert state["client"] sofort.
     """
     import customtkinter as ctk
+
     win = refs.get("window")
     if not win:
         return
@@ -388,6 +428,7 @@ def open_api_dialog():
     def on_close():
         refs["dlg_api"] = None
         dlg.destroy()
+
     dlg.protocol("WM_DELETE_WINDOW", on_close)
 
     dlg.title("API")
@@ -404,73 +445,126 @@ def open_api_dialog():
     saved = load_settings(APP_DIR)
 
     # --- Provider-Auswahl ---
-    ctk.CTkLabel(dlg, text="Provider:", font=font_label).pack(anchor="w", padx=px, pady=(py_section, 4))
+    ctk.CTkLabel(dlg, text="Provider:", font=font_label).pack(
+        anchor="w", padx=px, pady=(py_section, 4)
+    )
     provider_var = ctk.StringVar(value=saved.get(KEY_PROVIDER, DEFAULT_PROVIDER))
     provider_seg = ctk.CTkSegmentedButton(
-        dlg, values=["openai", "azure"], variable=provider_var,
-        width=200, height=32, font=font_body,
+        dlg,
+        values=["openai", "azure"],
+        variable=provider_var,
+        width=200,
+        height=32,
+        font=font_body,
     )
     provider_seg.pack(anchor="w", padx=px, pady=(0, py_section))
 
     # --- OpenAI-Bereich ---
     openai_frame = ctk.CTkFrame(dlg, fg_color="transparent")
 
-    ctk.CTkLabel(openai_frame, text="API Key (OpenAI):", font=font_label).pack(anchor="w", padx=0, pady=(0, 4))
+    ctk.CTkLabel(openai_frame, text="API Key (OpenAI):", font=font_label).pack(
+        anchor="w", padx=0, pady=(0, 4)
+    )
     oai_key_entry = ctk.CTkEntry(
-        openai_frame, width=entry_w, height=34, font=font_body, show="*",
-        placeholder_text="Leer = config.json oder bestehende Einstellungen"
+        openai_frame,
+        width=entry_w,
+        height=34,
+        font=font_body,
+        show="*",
+        placeholder_text="Leer = config.json oder bestehende Einstellungen",
     )
     oai_key_entry.pack(pady=(0, 4))
     oai_key_entry.insert(0, saved.get(KEY_API_KEY, ""))
 
     def _toggle_oai_show():
         oai_key_entry.configure(show="" if oai_key_entry.cget("show") == "*" else "*")
-    ctk.CTkButton(openai_frame, text="Anzeigen", width=100, height=26, font=font_body,
-                  command=_toggle_oai_show).pack(anchor="w", pady=(0, py_section))
 
-    ctk.CTkLabel(openai_frame, text="Modell (Spracherkennung):", font=font_label).pack(anchor="w", pady=(0, 4))
+    ctk.CTkButton(
+        openai_frame,
+        text="Anzeigen",
+        width=100,
+        height=26,
+        font=font_body,
+        command=_toggle_oai_show,
+    ).pack(anchor="w", pady=(0, py_section))
+
+    ctk.CTkLabel(openai_frame, text="Modell (Spracherkennung):", font=font_label).pack(
+        anchor="w", pady=(0, 4)
+    )
     transcribe_models = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"]
     cur_transcribe = saved.get(KEY_TRANSCRIBE_MODEL, DEFAULT_TRANSCRIBE_MODEL)
     if cur_transcribe not in transcribe_models:
         transcribe_models = [cur_transcribe] + transcribe_models
     transcribe_var = ctk.StringVar(value=cur_transcribe)
-    ctk.CTkComboBox(openai_frame, values=transcribe_models, variable=transcribe_var,
-                    width=320, height=34, font=font_body).pack(anchor="w", pady=(0, py_section))
+    ctk.CTkComboBox(
+        openai_frame,
+        values=transcribe_models,
+        variable=transcribe_var,
+        width=320,
+        height=34,
+        font=font_body,
+    ).pack(anchor="w", pady=(0, py_section))
 
     # --- Azure-Bereich ---
     azure_frame = ctk.CTkFrame(dlg, fg_color="transparent")
 
-    ctk.CTkLabel(azure_frame, text="Endpoint URL (vollstaendig):", font=font_label).pack(anchor="w", padx=0, pady=(0, 4))
+    ctk.CTkLabel(
+        azure_frame, text="Endpoint URL (vollstaendig):", font=font_label
+    ).pack(anchor="w", padx=0, pady=(0, 4))
     az_endpoint_entry = ctk.CTkEntry(
-        azure_frame, width=entry_w, height=34, font=("Consolas", 10),
-        placeholder_text="https://<name>.cognitiveservices.azure.com/openai/deployments/..."
+        azure_frame,
+        width=entry_w,
+        height=34,
+        font=("Consolas", 10),
+        placeholder_text="https://<name>.cognitiveservices.azure.com/openai/deployments/...",
     )
     az_endpoint_entry.pack(pady=(0, 4))
     az_endpoint_entry.insert(0, saved.get(KEY_AZURE_ENDPOINT_URL, ""))
 
-    ctk.CTkLabel(azure_frame, text="API Key (Azure):", font=font_label).pack(anchor="w", pady=(0, 4))
+    ctk.CTkLabel(azure_frame, text="API Key (Azure):", font=font_label).pack(
+        anchor="w", pady=(0, 4)
+    )
     az_key_entry = ctk.CTkEntry(
-        azure_frame, width=entry_w, height=34, font=font_body, show="*",
-        placeholder_text="Azure API Key"
+        azure_frame,
+        width=entry_w,
+        height=34,
+        font=font_body,
+        show="*",
+        placeholder_text="Azure API Key",
     )
     az_key_entry.pack(pady=(0, 4))
     az_key_entry.insert(0, saved.get(KEY_AZURE_API_KEY, ""))
 
     def _toggle_az_show():
         az_key_entry.configure(show="" if az_key_entry.cget("show") == "*" else "*")
-    ctk.CTkButton(azure_frame, text="Anzeigen", width=100, height=26, font=font_body,
-                  command=_toggle_az_show).pack(anchor="w", pady=(0, py_section))
+
+    ctk.CTkButton(
+        azure_frame,
+        text="Anzeigen",
+        width=100,
+        height=26,
+        font=font_body,
+        command=_toggle_az_show,
+    ).pack(anchor="w", pady=(0, py_section))
 
     # --- Gemeinsam: Glaettungsmodell ---
     smoother_frame = ctk.CTkFrame(dlg, fg_color="transparent")
-    ctk.CTkLabel(smoother_frame, text="Modell (Text-Glaettung):", font=font_label).pack(anchor="w", padx=0, pady=(0, 4))
+    ctk.CTkLabel(smoother_frame, text="Modell (Text-Glaettung):", font=font_label).pack(
+        anchor="w", padx=0, pady=(0, 4)
+    )
     smoother_models = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
     cur_smoother = state.get("smoother_model", DEFAULT_SMOOTHER_MODEL)
     if cur_smoother not in smoother_models:
         smoother_models = [cur_smoother] + smoother_models
     smoother_var = ctk.StringVar(value=cur_smoother)
-    ctk.CTkComboBox(smoother_frame, values=smoother_models, variable=smoother_var,
-                    width=320, height=34, font=font_body).pack(anchor="w", pady=(0, 4))
+    ctk.CTkComboBox(
+        smoother_frame,
+        values=smoother_models,
+        variable=smoother_var,
+        width=320,
+        height=34,
+        font=font_body,
+    ).pack(anchor="w", pady=(0, 4))
 
     # --- Provider-Switch: Sektionen ein-/ausblenden ---
     def _on_provider_change(val=None):
@@ -495,7 +589,9 @@ def open_api_dialog():
         data[KEY_SMOOTHER_MODEL] = smoother_model
         if provider == "openai":
             data[KEY_API_KEY] = (oai_key_entry.get() or "").strip()
-            data[KEY_TRANSCRIBE_MODEL] = (transcribe_var.get() or "").strip() or DEFAULT_TRANSCRIBE_MODEL
+            data[KEY_TRANSCRIBE_MODEL] = (
+                transcribe_var.get() or ""
+            ).strip() or DEFAULT_TRANSCRIBE_MODEL
         else:
             data[KEY_AZURE_ENDPOINT_URL] = (az_endpoint_entry.get() or "").strip()
             data[KEY_AZURE_API_KEY] = (az_key_entry.get() or "").strip()
@@ -514,8 +610,14 @@ def open_api_dialog():
         dlg.destroy()
 
     ctk.CTkButton(
-        dlg, text="Speichern", width=120, height=36, font=("Arial", 12, "bold"),
-        command=on_save, fg_color="#1E88E5", hover_color="#1976D2"
+        dlg,
+        text="Speichern",
+        width=120,
+        height=36,
+        font=("Arial", 12, "bold"),
+        command=on_save,
+        fg_color="#1E88E5",
+        hover_color="#1976D2",
     ).pack(pady=py_section)
 
 
@@ -525,10 +627,11 @@ def open_smoothing_dialog():
     bearbeiten, speichern, Default wieder laden (ueberschreibt aktuelle Eingabe mit Skill-Default).
     """
     import customtkinter as ctk
+
     win = refs.get("window")
     if not win:
         return
-        
+
     existing_dlg = refs.get("dlg_smoothing")
     if existing_dlg and existing_dlg.winfo_exists():
         existing_dlg.destroy()
@@ -537,10 +640,11 @@ def open_smoothing_dialog():
 
     dlg = ctk.CTkToplevel(win)
     refs["dlg_smoothing"] = dlg
-    
+
     def on_close():
         refs["dlg_smoothing"] = None
         dlg.destroy()
+
     dlg.protocol("WM_DELETE_WINDOW", on_close)
 
     dlg.title("Smoothing")
@@ -550,7 +654,9 @@ def open_smoothing_dialog():
     dx, dy = get_dialog_position_beside_parent(win, dlg_w, dlg_h)
     dlg.geometry(f"{dlg_w}x{dlg_h}+{dx}+{dy}")
 
-    scroll = ctk.CTkScrollableFrame(dlg, width=dlg_w - 20, height=dlg_h - 100, fg_color="transparent")
+    scroll = ctk.CTkScrollableFrame(
+        dlg, width=dlg_w - 20, height=dlg_h - 100, fg_color="transparent"
+    )
     scroll.pack(fill="both", expand=True, padx=(10, 0), pady=(10, 10))
 
     px, py_section = 24, 14
@@ -560,21 +666,34 @@ def open_smoothing_dialog():
     textbox_w = 560
 
     ctk.CTkLabel(
-        scroll, text="Text-Glaettung: Prompts fuer Korrektur nach Spracherkennung (wenn 'Glaetten' aktiv).",
-        font=("Arial", 10), text_color="#AAAAAA"
+        scroll,
+        text="Text-Glaettung: Prompts fuer Korrektur nach Spracherkennung (wenn 'Glaetten' aktiv).",
+        font=("Arial", 10),
+        text_color="#AAAAAA",
     ).pack(anchor="w", padx=px, pady=(0, 8))
 
     use_custom_var = ctk.BooleanVar(value=state.get("use_custom_smoother", False))
     ctk.CTkCheckBox(
-        scroll, text="Benutzerdefinierte Prompts verwenden (sonst Standard DE/EN)", variable=use_custom_var,
-        font=font_body, height=28, checkbox_width=22, checkbox_height=22
+        scroll,
+        text="Benutzerdefinierte Prompts verwenden (sonst Standard DE/EN)",
+        variable=use_custom_var,
+        font=font_body,
+        height=28,
+        checkbox_width=22,
+        checkbox_height=22,
     ).pack(anchor="w", padx=px, pady=(0, py_section))
 
-    ctk.CTkLabel(scroll, text="System-Prompt (Rolle):", font=font_label).pack(anchor="w", padx=px, pady=(4, 4))
+    ctk.CTkLabel(scroll, text="System-Prompt (Rolle):", font=font_label).pack(
+        anchor="w", padx=px, pady=(4, 4)
+    )
     sys_text = ctk.CTkTextbox(scroll, width=textbox_w, height=76, font=font_body)
     sys_text.pack(padx=px, pady=(0, 8))
     sys_text.insert("1.0", state.get("custom_smoother_system", ""))
-    ctk.CTkLabel(scroll, text="User-Prompt (Anweisung + Platzhalter fuer Originaltext):", font=font_body).pack(anchor="w", padx=px, pady=(4, 4))
+    ctk.CTkLabel(
+        scroll,
+        text="User-Prompt (Anweisung + Platzhalter fuer Originaltext):",
+        font=font_body,
+    ).pack(anchor="w", padx=px, pady=(4, 4))
     user_text = ctk.CTkTextbox(scroll, width=textbox_w, height=100, font=font_body)
     user_text.pack(padx=px, pady=(0, 12))
 
@@ -590,13 +709,24 @@ def open_smoothing_dialog():
         user_text.insert("1.0", prompts_de.get("user", ""))
 
     ctk.CTkButton(
-        btn_frame, text="Default laden", width=120, height=32, font=font_body,
-        command=load_default, fg_color="#555555", hover_color="#666666"
+        btn_frame,
+        text="Default laden",
+        width=120,
+        height=32,
+        font=font_body,
+        command=load_default,
+        fg_color="#555555",
+        hover_color="#666666",
     ).pack(side="left", padx=(0, 8))
     ctk.CTkButton(
-        btn_frame, text="Speichern", width=120, height=32, font=("Arial", 12, "bold"),
+        btn_frame,
+        text="Speichern",
+        width=120,
+        height=32,
+        font=("Arial", 12, "bold"),
         command=lambda: _smoothing_save(dlg, use_custom_var, sys_text, user_text),
-        fg_color="#1E88E5", hover_color="#1976D2"
+        fg_color="#1E88E5",
+        hover_color="#1976D2",
     ).pack(side="left")
 
     def _smoothing_save(dialog, use_custom_var, sys_textbox, user_textbox):
@@ -628,10 +758,11 @@ def open_keys_dialog():
     aktualisiert HOTKEYS und Tk-Binding sofort.
     """
     import customtkinter as ctk
+
     win = refs.get("window")
     if not win:
         return
-        
+
     existing_dlg = refs.get("dlg_keys")
     if existing_dlg and existing_dlg.winfo_exists():
         existing_dlg.destroy()
@@ -640,10 +771,11 @@ def open_keys_dialog():
 
     dlg = ctk.CTkToplevel(win)
     refs["dlg_keys"] = dlg
-    
+
     def on_close():
         refs["dlg_keys"] = None
         dlg.destroy()
+
     dlg.protocol("WM_DELETE_WINDOW", on_close)
 
     dlg.title("Keyboard")
@@ -658,7 +790,9 @@ def open_keys_dialog():
     font_body = ("Arial", 11)
     entry_w = 280
 
-    ctk.CTkLabel(dlg, text="Start/Stop (z.B. ctrl+y, ctrl+shift+y):", font=font_label).pack(anchor="w", padx=px, pady=(py_section, 6))
+    ctk.CTkLabel(
+        dlg, text="Start/Stop (z.B. ctrl+y, ctrl+shift+y):", font=font_label
+    ).pack(anchor="w", padx=px, pady=(py_section, 6))
     key_entry = ctk.CTkEntry(dlg, width=entry_w, height=36, font=font_body)
     key_entry.pack(padx=px, pady=(0, 8))
     key_entry.insert(0, HOTKEYS["start_stop"])
@@ -671,7 +805,9 @@ def open_keys_dialog():
         key_entry.insert(0, DEFAULT_HOTKEY_START_STOP)
 
     def on_save():
-        new_val = (key_entry.get() or "").strip().lower().replace("strg", "ctrl") or DEFAULT_HOTKEY_START_STOP
+        new_val = (key_entry.get() or "").strip().lower().replace(
+            "strg", "ctrl"
+        ) or DEFAULT_HOTKEY_START_STOP
         data = load_settings(APP_DIR)
         data[KEY_HOTKEY_START_STOP] = new_val
         save_settings(APP_DIR, data)
@@ -689,8 +825,26 @@ def open_keys_dialog():
         refs["dlg_keys"] = None
         dlg.destroy()
 
-    ctk.CTkButton(btn_frame, text="Default", width=90, height=32, font=font_body, command=load_default, fg_color="#555555", hover_color="#666666").pack(side="left", padx=(0, 8))
-    ctk.CTkButton(btn_frame, text="Speichern", width=100, height=32, font=("Arial", 12, "bold"), command=on_save, fg_color="#1E88E5", hover_color="#1976D2").pack(side="left")
+    ctk.CTkButton(
+        btn_frame,
+        text="Default",
+        width=90,
+        height=32,
+        font=font_body,
+        command=load_default,
+        fg_color="#555555",
+        hover_color="#666666",
+    ).pack(side="left", padx=(0, 8))
+    ctk.CTkButton(
+        btn_frame,
+        text="Speichern",
+        width=100,
+        height=32,
+        font=("Arial", 12, "bold"),
+        command=on_save,
+        fg_color="#1E88E5",
+        hover_color="#1976D2",
+    ).pack(side="left")
     dlg.focus_force()
 
 
@@ -757,6 +911,7 @@ def main():
         def __init__(self, original, name):
             self._original = original
             self._name = name
+
         def write(self, s):
             if s:
                 try:
@@ -768,25 +923,33 @@ def main():
                     _log_queue.put_nowait(s)
                 except Exception:
                     pass
+
         def flush(self):
             try:
                 self._original.flush()
             except Exception:
                 pass
+
     sys.stdout = _Tee(sys.__stdout__, "stdout")
     sys.stderr = _Tee(sys.__stderr__, "stderr")
 
     def _drain_log_queue():
         try:
-            log_text = refs.get("log_text")
-            if log_text and log_text.winfo_exists():
-                while True:
-                    try:
-                        s = _log_queue.get_nowait()
-                        log_text.insert("end", s)
-                        log_text.see("end")
-                    except queue.Empty:
-                        break
+            log_scroll = refs.get("log_scroll")
+            while True:
+                try:
+                    s = _log_queue.get_nowait()
+                    if log_scroll and (
+                        "Fehler" in s
+                        or "fehlgeschlagen" in s
+                        or "API" in s
+                        or "Exception" in s
+                    ):
+                        add_bubble = refs.get("add_chat_bubble")
+                        if add_bubble:
+                            add_bubble(s.strip(), "error")
+                except queue.Empty:
+                    break
         except Exception:
             pass
         w = refs.get("window")
@@ -794,7 +957,7 @@ def main():
             w.after(200, _drain_log_queue)
 
     refs["window"].after(200, _drain_log_queue)
-    print("Ctrl+Y Start/Stop, Alt+Q Quit.")
+    _log_to_chat("Ctrl+Y Start/Stop, Alt+Q Quit.", "system")
 
     def poll():
         try:

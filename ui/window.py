@@ -7,9 +7,69 @@
 # =============================================================================
 
 import sys
+import pyperclip
 import customtkinter as ctk
 
 from .animation import init_animation
+
+
+def _create_chat_bubble(parent, text, bubble_type="system"):
+    """
+    Erstellt eine ChatBubble mit Text und Copy-Button.
+    bubble_type: "transcript" (blau) oder "error" (rot)
+    """
+    bubble_colors = {
+        "transcript": {"bg": "#1E88E5", "text": "#FFFFFF", "label": "Ergebnis"},
+        "error": {"bg": "#E53935", "text": "#FFFFFF", "label": "Fehler"},
+    }
+    if bubble_type not in bubble_colors:
+        return None
+    colors = bubble_colors[bubble_type]
+
+    bubble_frame = ctk.CTkFrame(
+        parent, corner_radius=8, fg_color=colors["bg"], border_width=0
+    )
+
+    header_frame = ctk.CTkFrame(bubble_frame, corner_radius=0, fg_color="transparent")
+    header_frame.pack(fill="x", padx=8, pady=(6, 2))
+
+    label = ctk.CTkLabel(
+        header_frame,
+        text=colors["label"],
+        font=("Arial", 9, "bold"),
+        text_color=colors["text"],
+    )
+    label.pack(side="left")
+
+    def copy_text():
+        pyperclip.copy(text)
+
+    copy_btn = ctk.CTkButton(
+        header_frame,
+        text="Copy",
+        command=copy_text,
+        width=50,
+        height=20,
+        corner_radius=4,
+        fg_color="#555555",
+        hover_color="#666666",
+        font=("Arial", 8),
+    )
+    copy_btn.pack(side="right")
+
+    text_label = ctk.CTkLabel(
+        bubble_frame,
+        text=text,
+        font=("Consolas", 10),
+        text_color=colors["text"],
+        wraplength=280,
+        justify="left",
+    )
+    text_label.pack(fill="x", padx=8, pady=(0, 6))
+
+    return bubble_frame
+
+
 from .constants import (
     LABEL_SPRACHE,
     LABEL_GLAETTEN,
@@ -73,6 +133,7 @@ def _set_taskbar_visible(window):
         return
     try:
         from ctypes import windll
+
         GWL_EXSTYLE = -20
         WS_EX_APPWINDOW = 0x00040000
         WS_EX_TOOLWINDOW = 0x00000080
@@ -97,7 +158,9 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     """
     is_minimal = initial_state.get("is_minimal_mode", True)
     transform_enabled = initial_state.get("transform_text_enabled", False)
-    lang_label_text = "DE" if initial_state.get("current_language", "de") == "de" else "EN"
+    lang_label_text = (
+        "DE" if initial_state.get("current_language", "de") == "de" else "EN"
+    )
     top_bar_compact = initial_state.get("top_bar_compact", False)
 
     ctk.set_appearance_mode("dark")
@@ -117,20 +180,26 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
 
     main_frame = ctk.CTkFrame(win, corner_radius=15, fg_color="#333333", border_width=0)
     main_frame.pack(fill="both", expand=True, padx=0, pady=0)
-    content_frame = ctk.CTkFrame(main_frame, corner_radius=12, fg_color="#333333", border_width=0)
+    content_frame = ctk.CTkFrame(
+        main_frame, corner_radius=12, fg_color="#333333", border_width=0
+    )
     # Kompakt: padx=0, symmetrisches pady (COMPACT_PADY oben/unten), Top-Zeile zentriert
     compact_padx = 0 if top_bar_compact else 5
     compact_pady = (COMPACT_PADY, COMPACT_PADY) if top_bar_compact else 5
     content_frame.pack(fill="both", expand=True, padx=compact_padx, pady=compact_pady)
 
     # Wrapper nimmt volle Breite; top_frame darin zentriert (links/rechts gleich)
-    center_wrapper = ctk.CTkFrame(content_frame, corner_radius=0, fg_color="transparent")
+    center_wrapper = ctk.CTkFrame(
+        content_frame, corner_radius=0, fg_color="transparent"
+    )
     center_wrapper.pack(fill="both", expand=True)
 
     button_bg = "#1E88E5"
     top_frame = ctk.CTkFrame(center_wrapper, corner_radius=0, fg_color="transparent")
     # Kompakt: anchor="center" damit Balken+Switches+i horizontal zentriert; vertikal pady=0
-    top_frame.pack(pady=0 if top_bar_compact else 2, anchor="center" if top_bar_compact else "n")
+    top_frame.pack(
+        pady=0 if top_bar_compact else 2, anchor="center" if top_bar_compact else "n"
+    )
 
     # Animation: 7 Balken auf Canvas; ui.animation steuert Farbwechsel (start/stop von aussen)
     # Alle Masse mit ANIM_SCALE (Proportionen bleiben gleich)
@@ -140,7 +209,9 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     heights = [max(1, int(h * ANIM_SCALE)) for h in _base_heights]
     cw = max(20, int(100 * ANIM_SCALE))
     ch = max(8, int(24 * ANIM_SCALE))
-    canvas = ctk.CTkCanvas(anim_frame, width=cw, height=ch, bg="#333333", highlightthickness=0)
+    canvas = ctk.CTkCanvas(
+        anim_frame, width=cw, height=ch, bg="#333333", highlightthickness=0
+    )
     canvas.pack()
     bar_width = bar_spacing = max(1, int(6 * ANIM_SCALE))
     total_bars = (len(heights) * bar_width) + ((len(heights) - 1) * bar_spacing)
@@ -163,20 +234,36 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     _sw_font = max(8, int(10 * SWITCH_SCALE))
     lang_switch_var = ctk.StringVar(value=lang_label_text)
     lang_switch = ctk.CTkSwitch(
-        top_frame, text=LABEL_SPRACHE, command=callbacks["toggle_language"],
-        variable=lang_switch_var, onvalue="DE", offvalue="EN",
-        width=_sw_w, height=_sw_h, switch_width=_sw_sw, switch_height=_sw_sh, corner_radius=_sw_cr,
-        progress_color=button_bg, font=("Arial", _sw_font)
+        top_frame,
+        text=LABEL_SPRACHE,
+        command=callbacks["toggle_language"],
+        variable=lang_switch_var,
+        onvalue="DE",
+        offvalue="EN",
+        width=_sw_w,
+        height=_sw_h,
+        switch_width=_sw_sw,
+        switch_height=_sw_sh,
+        corner_radius=_sw_cr,
+        progress_color=button_bg,
+        font=("Arial", _sw_font),
     )
     lang_switch.grid(row=0, column=1, padx=(6, 4))
     refs["lang_switch_var"] = lang_switch_var
     refs["lang_switch"] = lang_switch
     _label_font = max(9, int(11 * SWITCH_SCALE))
-    lang_label = ctk.CTkLabel(top_frame, text=lang_label_text, font=("Arial", _label_font, "bold"), text_color="#FFFFFF")
+    lang_label = ctk.CTkLabel(
+        top_frame,
+        text=lang_label_text,
+        font=("Arial", _label_font, "bold"),
+        text_color="#FFFFFF",
+    )
     lang_label.grid(row=0, column=2, padx=4)
 
     # Vertikaler Trennstrich zwischen Sprache und Glaetten (Hilfe fuer das Auge); Hoehe wie Switch
-    sep = ctk.CTkFrame(top_frame, width=2, height=_sw_h, fg_color="#FFFFFF", corner_radius=0)
+    sep = ctk.CTkFrame(
+        top_frame, width=2, height=_sw_h, fg_color="#FFFFFF", corner_radius=0
+    )
     sep.grid(row=0, column=3, padx=8, pady=2)
     sep.grid_propagate(False)
 
@@ -184,9 +271,19 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     _tw = max(20, int(76 * SWITCH_SCALE))
     transform_var = ctk.BooleanVar(value=transform_enabled)
     transform_switch = ctk.CTkSwitch(
-        top_frame, text=LABEL_GLAETTEN, variable=transform_var, command=callbacks["toggle_transform_text"],
-        onvalue=True, offvalue=False, width=_tw, height=_sw_h, switch_width=_sw_sw, switch_height=_sw_sh,
-        corner_radius=_sw_cr, progress_color="#00D100", font=("Arial", _sw_font)
+        top_frame,
+        text=LABEL_GLAETTEN,
+        variable=transform_var,
+        command=callbacks["toggle_transform_text"],
+        onvalue=True,
+        offvalue=False,
+        width=_tw,
+        height=_sw_h,
+        switch_width=_sw_sw,
+        switch_height=_sw_sh,
+        corner_radius=_sw_cr,
+        progress_color="#00D100",
+        font=("Arial", _sw_font),
     )
     transform_switch.grid(row=0, column=4, padx=(4, 2))
     refs["transform_text_var"] = transform_var
@@ -199,9 +296,16 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     _ib_font = max(8, int(11 * INFO_BTN_FONT_SCALE))
     info_btn_fg = INFO_BTN_BG if top_bar_compact else INFO_BTN_BG
     info_btn = ctk.CTkButton(
-        top_frame, text="i", command=callbacks["toggle_info_compact"],
-        width=_ib_sz, height=_ib_sz, corner_radius=_ib_cr, fg_color=info_btn_fg, hover_color=INFO_BTN_BG_HOVER,
-        text_color=INFO_BTN_TEXT_COLOR, font=("Arial", _ib_font, "bold")
+        top_frame,
+        text="i",
+        command=callbacks["toggle_info_compact"],
+        width=_ib_sz,
+        height=_ib_sz,
+        corner_radius=_ib_cr,
+        fg_color=info_btn_fg,
+        hover_color=INFO_BTN_BG_HOVER,
+        text_color=INFO_BTN_TEXT_COLOR,
+        font=("Arial", _ib_font, "bold"),
     )
     info_btn.grid(row=0, column=6, padx=(2, 4))
 
@@ -209,52 +313,123 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     button_frame = ctk.CTkFrame(center_wrapper, corner_radius=0, fg_color="transparent")
     bw, bh = 65, 28
     record_btn = ctk.CTkButton(
-        button_frame, text="Start", command=callbacks["start_recording"],
-        corner_radius=10, height=bh, width=bw, fg_color=button_bg, hover_color="#1976D2"
+        button_frame,
+        text="Start",
+        command=callbacks["start_recording"],
+        corner_radius=10,
+        height=bh,
+        width=bw,
+        fg_color=button_bg,
+        hover_color="#1976D2",
     )
     record_btn.grid(row=0, column=0, padx=2)
     stop_btn = ctk.CTkButton(
-        button_frame, text="Stop", command=callbacks["stop_recording"],
-        corner_radius=10, height=bh, width=bw, fg_color=button_bg, hover_color="#1976D2"
+        button_frame,
+        text="Stop",
+        command=callbacks["stop_recording"],
+        corner_radius=10,
+        height=bh,
+        width=bw,
+        fg_color=button_bg,
+        hover_color="#1976D2",
     )
     stop_btn.grid(row=0, column=1, padx=2)
-    kb_initial = "Keyboard: On" if initial_state.get("keyboard_enabled", True) else "Keyboard: Off"
+    kb_initial = (
+        "Keyboard: On"
+        if initial_state.get("keyboard_enabled", True)
+        else "Keyboard: Off"
+    )
     kb_btn = ctk.CTkButton(
-        button_frame, text=kb_initial, command=callbacks["toggle_keyboard"],
-        corner_radius=10, height=bh, width=100, fg_color=button_bg, hover_color="#1976D2"
+        button_frame,
+        text=kb_initial,
+        command=callbacks["toggle_keyboard"],
+        corner_radius=10,
+        height=bh,
+        width=100,
+        fg_color=button_bg,
+        hover_color="#1976D2",
     )
     kb_btn.grid(row=0, column=2, padx=2)
 
     # Zeile 2: Smoothing, API, Keys, Quit (links)
     bottom_frame = ctk.CTkFrame(center_wrapper, corner_radius=0, fg_color="transparent")
     smooth_btn = ctk.CTkButton(
-        bottom_frame, text="Smoothing", command=callbacks["open_smoothing"],
-        corner_radius=10, height=24, width=85, fg_color=button_bg, hover_color="#1976D2"
+        bottom_frame,
+        text="Smoothing",
+        command=callbacks["open_smoothing"],
+        corner_radius=10,
+        height=24,
+        width=85,
+        fg_color=button_bg,
+        hover_color="#1976D2",
     )
     smooth_btn.grid(row=0, column=0, padx=2)
     api_btn = ctk.CTkButton(
-        bottom_frame, text="API", command=callbacks["open_api"],
-        corner_radius=10, height=24, width=60, fg_color=button_bg, hover_color="#1976D2"
+        bottom_frame,
+        text="API",
+        command=callbacks["open_api"],
+        corner_radius=10,
+        height=24,
+        width=60,
+        fg_color=button_bg,
+        hover_color="#1976D2",
     )
     api_btn.grid(row=0, column=1, padx=2)
     keys_btn = ctk.CTkButton(
-        bottom_frame, text="Keys", command=callbacks["open_keys"],
-        corner_radius=10, height=24, width=55, fg_color=button_bg, hover_color="#1976D2"
+        bottom_frame,
+        text="Keys",
+        command=callbacks["open_keys"],
+        corner_radius=10,
+        height=24,
+        width=55,
+        fg_color=button_bg,
+        hover_color="#1976D2",
     )
     keys_btn.grid(row=0, column=2, padx=2)
     quit_btn = ctk.CTkButton(
-        bottom_frame, text="Quit", command=callbacks["quit_app"],
-        corner_radius=10, height=24, width=60, fg_color="#E53935", hover_color="#C62828"
+        bottom_frame,
+        text="Quit",
+        command=callbacks["quit_app"],
+        corner_radius=10,
+        height=24,
+        width=60,
+        fg_color="#E53935",
+        hover_color="#C62828",
     )
     quit_btn.grid(row=0, column=3, padx=2)
 
-    # Log-Bereich (nur ausgeklappt): stdout/stderr wie im Terminal
-    log_frame = ctk.CTkFrame(center_wrapper, corner_radius=6, fg_color="#2a2a2a", border_width=1)
-    log_text = ctk.CTkTextbox(
-        log_frame, height=LOG_AREA_HEIGHT, font=("Consolas", 10), fg_color="#1a1a1a", text_color="#c0c0c0", wrap="word"
+    # Log-Bereich (nur ausgeklappt): Chat-Bubbles (scrollbar)
+    log_frame = ctk.CTkFrame(
+        center_wrapper, corner_radius=6, fg_color="#2a2a2a", border_width=1
     )
-    log_text.pack(fill="both", expand=True, padx=4, pady=4)
-    log_text.insert("0.0", "[Log] Ausgeklappt: hier erscheint Ausgabe wie im Terminal.\n")
+    log_scroll = ctk.CTkScrollableFrame(
+        log_frame,
+        height=LOG_AREA_HEIGHT,
+        fg_color="#2a2a2a",
+        scrollbar_button_color="#444444",
+        scrollbar_button_hover_color="#555555",
+    )
+    log_scroll.pack(fill="both", expand=True, padx=4, pady=4)
+
+    refs["log_scroll"] = log_scroll
+    refs["chat_bubbles"] = []
+
+    def add_chat_bubble(text, bubble_type="system"):
+        """Fuegt eine ChatBubble hinzu und scrollt nach unten."""
+        bubble = _create_chat_bubble(log_scroll, text, bubble_type)
+        if bubble is None:
+            return None
+        bubble.pack(fill="x", pady=(0, 4))
+        refs["chat_bubbles"].append(bubble)
+        try:
+            log_scroll._parent_canvas.yview_moveto(1.0)
+        except Exception:
+            pass
+        return bubble
+
+    refs["add_chat_bubble"] = add_chat_bubble
+
+    log_text = None
 
     _add_drag(win)
 
@@ -286,6 +461,7 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
 
     refs["log_frame"] = log_frame
     refs["log_text"] = log_text
+    refs["log_scroll"] = log_scroll
 
     # Tk-Bindings: hotkeys["start_stop"] -> start_stop_toggle, rest -> jeweiliger Callback
     sk = _tk_bind_key(hotkeys.get("start_stop", "ctrl+y"))
