@@ -5,6 +5,7 @@ from .recording import (
     audio_to_wav,
     get_available_microphones,
     get_active_microphones,
+    compute_audio_level,
 )
 from .transcription import transcribe
 
@@ -13,5 +14,6 @@ __all__ = [
     "audio_to_wav",
     "get_available_microphones",
     "get_active_microphones",
+    "compute_audio_level",
     "transcribe",
 ]

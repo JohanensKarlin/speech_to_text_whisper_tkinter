@@ -17,6 +17,7 @@ from urllib.parse import urlparse, parse_qs
 import keyboard
 import pyautogui
 import pyperclip
+import sounddevice as sd
 from openai import OpenAI, AzureOpenAI
 
 from config import (
@@ -46,6 +47,7 @@ from processing import (
     audio_to_wav,
     transcribe,
     get_active_microphones,
+    compute_audio_level,
 )
 from skill.text_smoothing.prompts import get_prompts
 from ui import (
@@ -189,6 +191,7 @@ refs = {}
 
 # Queue fuer Log-Ausgabe (stdout/stderr -> Log-Bereich im ausgeklappten Fenster); Haupt-Thread draint
 _log_queue = queue.Queue()
+_level_monitor_running = False
 
 
 def _log_to_chat(text, bubble_type="system"):
@@ -274,6 +277,7 @@ def _save_audio_settings():
 
 def select_microphone(display_name):
     _refresh_microphone_list_ui()
+    _start_mic_level_monitor()
     state["selected_mic_index"] = int(_resolve_selected_mic_index(display_name))
     _save_audio_settings()
 
@@ -307,6 +311,41 @@ def _update_mic_level(level):
         win.after(0, _apply)
     except Exception:
         pass
+
+
+def _start_mic_level_monitor():
+    global _level_monitor_running
+    if _level_monitor_running:
+        return
+    _level_monitor_running = True
+
+    def _worker():
+        while _level_monitor_running:
+            try:
+                if state.get("is_recording"):
+                    time.sleep(0.2)
+                    continue
+                mics = state.get("available_mics") or []
+                selected = state.get("selected_mic_index")
+                mic = next((m for m in mics if m.get("index") == selected), None)
+                sample_rate = int((mic or {}).get("samplerate", 16000) or 16000)
+                block_size = max(512, int(sample_rate / 20))
+                chunk = sd.rec(
+                    frames=block_size,
+                    samplerate=sample_rate,
+                    channels=1,
+                    dtype="int16",
+                    device=selected,
+                    blocking=True,
+                )
+                level = compute_audio_level(chunk)
+                _update_mic_level(level)
+                time.sleep(0.05)
+            except Exception:
+                _update_mic_level(0.0)
+                time.sleep(0.4)
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 # -----------------------------------------------------------------------------

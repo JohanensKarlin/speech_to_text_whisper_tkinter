@@ -91,10 +91,36 @@ def _tk_bind_key(key_str):
 def _add_drag(window):
     """Fenster per Maus ziehen: ButtonPress speichert Offset, B1-Motion setzt geometry.
     Text- und Entry-Widgets werden ausgespart, damit Textauswahl/Kopieren funktioniert."""
-    _no_drag_classes = {"Text", "Entry", "TEntry"}
+    _no_drag_classes = {
+        "Text",
+        "Entry",
+        "TEntry",
+        "Button",
+        "TButton",
+        "Scale",
+        "TScale",
+        "Scrollbar",
+        "TCombobox",
+        "Listbox",
+        "Spinbox",
+        "Canvas",
+    }
+
+    def _is_interactive_widget(widget):
+        w = widget
+        while w is not None:
+            try:
+                if w.winfo_class() in _no_drag_classes:
+                    return True
+                if w == window:
+                    return False
+                w = w.master
+            except Exception:
+                return True
+        return False
 
     def start_drag(event):
-        if event.widget.winfo_class() in _no_drag_classes:
+        if _is_interactive_widget(event.widget):
             return
         window._drag_data = {"x": event.x, "y": event.y}
 
