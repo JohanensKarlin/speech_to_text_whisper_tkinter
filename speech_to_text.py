@@ -35,13 +35,17 @@ from config import (
     KEY_AZURE_ENDPOINT_URL,
     KEY_AZURE_API_KEY,
     KEY_TRANSCRIBE_MODEL,
+    KEY_MICROPHONE_INDEX,
+    KEY_MICROPHONE_GAIN,
     DEFAULT_PROVIDER,
     DEFAULT_TRANSCRIBE_MODEL,
+    DEFAULT_MICROPHONE_GAIN,
 )
 from processing import (
     record_audio,
     audio_to_wav,
     transcribe,
+    get_active_microphones,
 )
 from skill.text_smoothing.prompts import get_prompts
 from ui import (
@@ -130,6 +134,14 @@ else:
 config = load_config(APP_DIR)
 settings = load_settings(APP_DIR)
 client = _build_client(settings, config)
+_mic_list = get_active_microphones()
+_saved_mic_index = int(settings.get(KEY_MICROPHONE_INDEX, -1)) if settings else -1
+_default_mic_index = _mic_list[0]["index"] if _mic_list else 0
+_selected_mic_index = (
+    _saved_mic_index
+    if any(m["index"] == _saved_mic_index for m in _mic_list)
+    else _default_mic_index
+)
 
 # Tastatur-Shortcuts: Keys wie sie von keyboard.is_pressed geprueft werden.
 # start_stop aus settings.json, Rest fest.
@@ -151,7 +163,13 @@ state = {
     "is_recording": False,
     "current_language": "de",
     "transform_text_enabled": False,
-    "selected_mic_index": 0,
+    "selected_mic_index": _selected_mic_index,
+    "available_mics": _mic_list,
+    "mic_gain": float(
+        settings.get(KEY_MICROPHONE_GAIN, DEFAULT_MICROPHONE_GAIN)
+        or DEFAULT_MICROPHONE_GAIN
+    ),
+    "mic_level": 0.0,
     "keyboard_enabled": True,
     "top_bar_compact": True,
     "stop_recording_event": threading.Event(),
@@ -195,6 +213,102 @@ def _paste_text(text):
         pyautogui.hotkey("ctrl", "v")
 
 
+def _mic_display_name(mic):
+    name = (mic or {}).get("name", "Unbekannt")
+    idx = (mic or {}).get("index", -1)
+    return f"{name} [{idx}]"
+
+
+def _refresh_microphone_list_ui():
+    mics = get_active_microphones()
+    if not mics:
+        mics = [
+            {
+                "index": 0,
+                "name": "Standard-Mikrofon",
+                "channels": 1,
+                "samplerate": 44100,
+            }
+        ]
+    state["available_mics"] = mics
+
+    if not any(m.get("index") == state.get("selected_mic_index") for m in mics):
+        state["selected_mic_index"] = mics[0].get("index", 0)
+        _save_audio_settings()
+
+    values = [_mic_display_name(m) for m in mics]
+    selected_name = _mic_display_name(
+        next(
+            (m for m in mics if m.get("index") == state.get("selected_mic_index")),
+            mics[0],
+        )
+    )
+
+    mic_combo = refs.get("mic_combo")
+    mic_var = refs.get("mic_var")
+    if mic_combo:
+        try:
+            mic_combo.configure(values=values)
+        except Exception:
+            pass
+    if mic_var:
+        try:
+            mic_var.set(selected_name)
+        except Exception:
+            pass
+
+
+def _resolve_selected_mic_index(display_name):
+    for mic in state.get("available_mics", []):
+        if _mic_display_name(mic) == display_name:
+            return mic.get("index", 0)
+    return state.get("selected_mic_index", 0)
+
+
+def _save_audio_settings():
+    data = load_settings(APP_DIR)
+    data[KEY_MICROPHONE_INDEX] = int(state.get("selected_mic_index", 0))
+    data[KEY_MICROPHONE_GAIN] = float(state.get("mic_gain", DEFAULT_MICROPHONE_GAIN))
+    save_settings(APP_DIR, data)
+
+
+def select_microphone(display_name):
+    _refresh_microphone_list_ui()
+    state["selected_mic_index"] = int(_resolve_selected_mic_index(display_name))
+    _save_audio_settings()
+
+
+def set_microphone_gain(value):
+    try:
+        state["mic_gain"] = max(0.5, min(3.0, float(value)))
+    except Exception:
+        state["mic_gain"] = DEFAULT_MICROPHONE_GAIN
+    _save_audio_settings()
+
+
+def _update_mic_level(level):
+    try:
+        v = max(0.0, min(1.0, float(level)))
+    except Exception:
+        v = 0.0
+    state["mic_level"] = v
+    win = refs.get("window")
+    pb = refs.get("level_progress")
+    if not win or not pb:
+        return
+
+    def _apply():
+        try:
+            pb.set(v)
+        except Exception:
+            pass
+
+    try:
+        win.after(0, _apply)
+    except Exception:
+        pass
+
+
 # -----------------------------------------------------------------------------
 # Aufnahme-Pipeline (läuft im Hintergrund-Thread)
 # -----------------------------------------------------------------------------
@@ -206,18 +320,23 @@ def process_recording():
     """
     state["is_recording"] = True
     state["stop_recording_event"].clear()
+    _update_mic_level(0.0)
     start_wave_animation()
     try:
-        audio_data = record_audio(
+        audio_data, used_sample_rate = record_audio(
             state["selected_mic_index"],
             state["stop_recording_event"],
+            gain=state.get("mic_gain", DEFAULT_MICROPHONE_GAIN),
+            level_callback=_update_mic_level,
+            retry_attempts=2,
+            return_sample_rate=True,
         )
         stop_wave_animation()
         if audio_data.size == 0:
             _log_to_chat("Keine Audiodaten aufgenommen.", "error")
             return
         start_reverse_animation()
-        wav_file = audio_to_wav(audio_data)
+        wav_file = audio_to_wav(audio_data, sample_rate=used_sample_rate)
         hallucination_path = os.path.join(APP_DIR, "hallucination.json")
         transform_var = refs.get("transform_text_var")
         transform_enabled = transform_var.get() if transform_var else False
@@ -238,6 +357,7 @@ def process_recording():
             custom_smoother_system=custom_sys,
             custom_smoother_user=custom_usr,
             smoother_model=state.get("smoother_model") or DEFAULT_SMOOTHER_MODEL,
+            retry_attempts=2,
         )
         stop_wave_animation()
         if text:
@@ -320,22 +440,28 @@ def toggle_info_compact():
     sep = refs.get("sep")
     info_btn = refs.get("info_btn")
     button_frame = refs.get("button_frame")
+    mic_frame = refs.get("mic_frame")
     bottom_frame = refs.get("bottom_frame")
     content_frame = refs.get("content_frame")
     top_frame = refs.get("top_frame")
 
-    if not all(
-        [
-            win,
-            lang_switch,
-            lang_label,
-            transform_switch,
-            sep,
-            info_btn,
-            button_frame,
-            bottom_frame,
-        ]
-    ):
+    if win is None:
+        return
+    if lang_switch is None:
+        return
+    if lang_label is None:
+        return
+    if transform_switch is None:
+        return
+    if sep is None:
+        return
+    if info_btn is None:
+        return
+    if button_frame is None:
+        return
+    if mic_frame is None:
+        return
+    if bottom_frame is None:
         return
 
     win.update_idletasks()
@@ -363,7 +489,9 @@ def toggle_info_compact():
             top_frame.pack_configure(pady=2, anchor="n")
 
         button_frame.pack(pady=2, after=top_frame)
-        bottom_frame.pack(pady=2, after=button_frame)
+        if mic_frame:
+            mic_frame.pack(pady=(2, 2), fill="x", after=button_frame)
+        bottom_frame.pack(pady=2, after=mic_frame if mic_frame else button_frame)
         log_frame = refs.get("log_frame")
         if log_frame:
             log_frame.pack(pady=4, fill="x")
@@ -389,6 +517,8 @@ def toggle_info_compact():
             top_frame.pack_configure(pady=0, anchor="center")
 
         button_frame.pack_forget()
+        if mic_frame:
+            mic_frame.pack_forget()
         bottom_frame.pack_forget()
         log_frame = refs.get("log_frame")
         if log_frame:
@@ -886,10 +1016,26 @@ def main():
     Mikrofone laden, Callbacks + initial_state bauen, Fenster erstellen (refs wird befuellt),
     dann poll()-Schleife starten und mainloop. Nach quit_app() erkennt poll() tote Fenster und beendet.
     """
+    mics = state.get("available_mics") or get_active_microphones()
+    if not mics:
+        mics = [
+            {
+                "index": 0,
+                "name": "Standard-Mikrofon",
+                "channels": 1,
+                "samplerate": 44100,
+            }
+        ]
+    state["available_mics"] = mics
+    if not any(m.get("index") == state.get("selected_mic_index") for m in mics):
+        state["selected_mic_index"] = mics[0]["index"]
+
     initial_state = {
         "top_bar_compact": state["top_bar_compact"],
         "transform_text_enabled": state["transform_text_enabled"],
         "current_language": state["current_language"],
+        "microphone_names": [_mic_display_name(m) for m in mics],
+        "microphone_gain": state.get("mic_gain", DEFAULT_MICROPHONE_GAIN),
     }
     callbacks = {
         "start_stop_toggle": start_stop_toggle,
@@ -900,11 +1046,15 @@ def main():
         "quit_app": quit_app,
         "toggle_info_compact": toggle_info_compact,
         "toggle_transform_text": toggle_transform_text,
+        "select_microphone": select_microphone,
+        "set_microphone_gain": set_microphone_gain,
         "open_api": open_api_dialog,
         "open_smoothing": open_smoothing_dialog,
         "open_keys": open_keys_dialog,
     }
     create_status_window(callbacks, HOTKEYS, initial_state, refs)
+
+    _refresh_microphone_list_ui()
 
     # Stdout/Stderr in Log-Bereich umleiten (thread-sicher: Queue, Haupt-Thread schreibt ins Widget)
     class _Tee:

@@ -301,7 +301,7 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     )
     info_btn.grid(row=0, column=6, padx=(2, 4))
 
-    # Zeile 1: Start, Stop, Mic, Keyboard (links)
+    # Zeile 1: Start, Stop, Keyboard (links)
     button_frame = ctk.CTkFrame(center_wrapper, corner_radius=0, fg_color="transparent")
     bw, bh = 65, 28
     record_btn = ctk.CTkButton(
@@ -342,6 +342,73 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
         hover_color="#1976D2",
     )
     kb_btn.grid(row=0, column=2, padx=2)
+
+    # Zeile 1b: Mikrofon-Auswahl, Pegel und Gain
+    mic_frame = ctk.CTkFrame(center_wrapper, corner_radius=8, fg_color="#2d2d2d")
+    ctk.CTkLabel(
+        mic_frame,
+        text="Mic",
+        font=("Arial", 11, "bold"),
+        text_color="#E0E0E0",
+    ).grid(row=0, column=0, padx=(8, 6), pady=(6, 2), sticky="w")
+
+    mic_values = initial_state.get("microphone_names", ["Default-Mikrofon"])
+    mic_var = ctk.StringVar(value=(mic_values[0] if mic_values else "Default-Mikrofon"))
+    mic_combo = ctk.CTkComboBox(
+        mic_frame,
+        values=mic_values,
+        variable=mic_var,
+        width=220,
+        height=28,
+        font=("Arial", 11),
+        command=lambda selected: callbacks["select_microphone"](selected),
+    )
+    mic_combo.grid(row=0, column=1, padx=(0, 8), pady=(6, 2), sticky="w")
+
+    ctk.CTkLabel(
+        mic_frame,
+        text="Input",
+        font=("Arial", 10),
+        text_color="#AFAFAF",
+    ).grid(row=1, column=0, padx=(8, 6), pady=(0, 6), sticky="w")
+    level_progress = ctk.CTkProgressBar(
+        mic_frame,
+        width=190,
+        height=12,
+        progress_color="#00D26A",
+    )
+    level_progress.set(0.0)
+    level_progress.grid(row=1, column=1, padx=(0, 6), pady=(0, 6), sticky="w")
+
+    gain_val = float(initial_state.get("microphone_gain", 1.0))
+    gain_steps_val = int(round(gain_val * 10.0))
+    gain_var = ctk.IntVar(value=max(5, min(30, gain_steps_val)))
+    gain_label = ctk.CTkLabel(
+        mic_frame,
+        text=f"Gain {gain_val:.1f}x",
+        font=("Arial", 10),
+        text_color="#AFAFAF",
+    )
+    gain_label.grid(row=1, column=2, padx=(0, 4), pady=(0, 6), sticky="w")
+
+    def _on_gain_change(value):
+        try:
+            v = float(value) / 10.0
+        except Exception:
+            v = 1.0
+        gain_label.configure(text=f"Gain {v:.1f}x")
+        callbacks["set_microphone_gain"](v)
+
+    gain_slider = ctk.CTkSlider(
+        mic_frame,
+        from_=5,
+        to=30,
+        number_of_steps=25,
+        variable=gain_var,
+        width=90,
+        command=_on_gain_change,
+    )
+    gain_slider.grid(row=1, column=3, padx=(0, 4), pady=(0, 6), sticky="w")
 
     # Zeile 2: Smoothing, API, Keys, Quit (links)
     bottom_frame = ctk.CTkFrame(center_wrapper, corner_radius=0, fg_color="transparent")
@@ -444,10 +511,12 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     # Im Kompakt-Modus nur top_frame; ausgeklappt: top_frame, button_frame, bottom_frame, log_frame
     if top_bar_compact:
         button_frame.pack_forget()
+        mic_frame.pack_forget()
         bottom_frame.pack_forget()
         log_frame.pack_forget()
     else:
         button_frame.pack(pady=2, anchor="w")
+        mic_frame.pack(pady=(2, 2), fill="x")
         bottom_frame.pack(pady=2, anchor="w")
         log_frame.pack(pady=4, fill="x")
 
@@ -475,6 +544,11 @@ def create_status_window(callbacks, hotkeys, initial_state, refs):
     refs["info_btn"] = info_btn
     refs["keyboard_button"] = kb_btn
     refs["button_frame"] = button_frame
+    refs["mic_frame"] = mic_frame
+    refs["mic_combo"] = mic_combo
+    refs["mic_var"] = mic_var
+    refs["level_progress"] = level_progress
+    refs["gain_slider"] = gain_slider
     refs["bottom_frame"] = bottom_frame
     refs["content_frame"] = content_frame
     refs["top_frame"] = top_frame

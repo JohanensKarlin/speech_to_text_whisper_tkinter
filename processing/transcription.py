@@ -17,8 +17,9 @@ from skill.text_smoothing import smooth_transcription
 
 def _load_hallucinations(hallucination_path):
     """Laedt hallucination.json: Dict mit Sprachen als Keys, Listen von Mustern als Values."""
-    if hasattr(sys, '_MEIPASS'):
-        hallucination_path = os.path.join(sys._MEIPASS, "hallucination.json")
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        hallucination_path = os.path.join(meipass, "hallucination.json")
     with open(hallucination_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -53,6 +54,7 @@ def transcribe(
     custom_smoother_system=None,
     custom_smoother_user=None,
     smoother_model=None,
+    retry_attempts=2,
 ):
     """
     Pipeline: WAV -> Whisper API -> Halluzinationsfilter -> optional smooth_transcription (Skill).
@@ -64,16 +66,29 @@ def transcribe(
             tmp.write(audio_file.read())
             tmp_path = tmp.name
         try:
-            with open(tmp_path, "rb") as audio:
-                transcript = client.audio.transcriptions.create(
-                    model=model_transcribe,
-                    file=audio,
-                    language=language,
-                )
+            last_error = None
+            transcript = None
+            for attempt in range(retry_attempts + 1):
+                try:
+                    with open(tmp_path, "rb") as audio:
+                        transcript = client.audio.transcriptions.create(
+                            model=model_transcribe,
+                            file=audio,
+                            language=language,
+                        )
+                    break
+                except Exception as api_err:
+                    last_error = api_err
+                    if attempt >= retry_attempts:
+                        raise
+            if transcript is None and last_error is not None:
+                raise last_error
         finally:
             os.unlink(tmp_path)
 
-        raw_text = transcript.text
+        raw_text = getattr(transcript, "text", None) if transcript is not None else None
+        if raw_text is None:
+            return None
         hallucinations = _load_hallucinations(hallucination_path)
         filtered_text = _filter_hallucinations(raw_text, language, hallucinations)
         if filtered_text != raw_text:

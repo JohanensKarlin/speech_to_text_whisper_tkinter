@@ -20,18 +20,22 @@ os.chdir(APP_ROOT)
 # Optionale Abhaengigkeiten (wenn nicht installiert: Tests ueberspringen)
 try:
     import sounddevice
+
     HAS_SOUNDDEVICE = True
 except ImportError:
     HAS_SOUNDDEVICE = False
 try:
     import customtkinter
+
     HAS_CTK = True
 except ImportError:
     HAS_CTK = False
 
+
 def test_config_load():
     """Config aus vorhandenem config.json oder Temp-Datei; fehlt Datei -> leeres Dict."""
     from config import load_config
+
     with tempfile.TemporaryDirectory() as d:
         cfg = load_config(d)
         assert isinstance(cfg, dict) and len(cfg) == 0, "Ohne config.json: leeres Dict"
@@ -41,16 +45,19 @@ def test_config_load():
         assert cfg.get("api_key") == "test-key"
     return True
 
+
 def test_get_available_microphones():
     """Mikrofon-Liste: Liste von Dicts mit index und name."""
     if not HAS_SOUNDDEVICE:
         return "skip"
     from processing import get_available_microphones
+
     mics = get_available_microphones()
     assert isinstance(mics, list), "Mikrofone muessen Liste sein"
     for m in mics:
         assert "index" in m and "name" in m
     return True
+
 
 def test_audio_to_wav():
     """audio_to_wav erzeugt lesbares WAV aus numpy-Array."""
@@ -58,6 +65,7 @@ def test_audio_to_wav():
         return "skip"
     import numpy as np
     from processing import audio_to_wav
+
     # 1 Sekunde Stille (44100 Samples)
     data = np.zeros(44100, dtype=np.int16)
     wav = audio_to_wav(data)
@@ -68,11 +76,13 @@ def test_audio_to_wav():
     wav.seek(0)
     return True
 
+
 def test_record_audio_stop_event():
     """record_audio bricht sofort ab wenn stop_event gesetzt."""
     if not HAS_SOUNDDEVICE:
         return "skip"
     from processing import record_audio
+
     ev = threading.Event()
     ev.set()
     out = record_audio(0, ev, sample_rate=44100)
@@ -81,9 +91,11 @@ def test_record_audio_stop_event():
     assert out.size == 0, "Sofort gestoppt = leeres Array"
     return True
 
+
 def test_prompts_de_en():
     """Skill prompts: de und en liefern system + user."""
     from skill.text_smoothing.prompts import get_prompts
+
     for lang in ("de", "en"):
         p = get_prompts(lang)
         assert "system" in p and "user" in p
@@ -93,28 +105,45 @@ def test_prompts_de_en():
     assert "system" in p
     return True
 
+
 def test_smooth_transcription_empty():
     """smooth_transcription bei leerem Text gibt Text unveraendert zurueck."""
     from skill.text_smoothing import smooth_transcription
+
     class FakeClient:
         pass
+
     assert smooth_transcription(FakeClient(), "", "de") == ""
     assert smooth_transcription(FakeClient(), "  ", "en") == "  "
     return True
 
+
 def test_settings_load_save():
     """Settings: load_settings/save_settings roundtrip in Temp-Dir (inkl. smoother_model)."""
-    from config import load_settings, save_settings, KEY_API_KEY, KEY_USE_CUSTOM_SMOOTHER, KEY_CUSTOM_SMOOTHER_SYSTEM, KEY_CUSTOM_SMOOTHER_USER, KEY_SMOOTHER_MODEL, DEFAULT_SMOOTHER_MODEL
+    from config import (
+        load_settings,
+        save_settings,
+        KEY_API_KEY,
+        KEY_USE_CUSTOM_SMOOTHER,
+        KEY_CUSTOM_SMOOTHER_SYSTEM,
+        KEY_CUSTOM_SMOOTHER_USER,
+        KEY_SMOOTHER_MODEL,
+        DEFAULT_SMOOTHER_MODEL,
+    )
+
     with tempfile.TemporaryDirectory() as d:
         empty = load_settings(d)
         assert empty == {} or (isinstance(empty, dict) and KEY_API_KEY in empty)
-        save_settings(d, {
-            KEY_API_KEY: "sk-test",
-            KEY_USE_CUSTOM_SMOOTHER: True,
-            KEY_CUSTOM_SMOOTHER_SYSTEM: "System",
-            KEY_CUSTOM_SMOOTHER_USER: "User",
-            KEY_SMOOTHER_MODEL: "gpt-4o",
-        })
+        save_settings(
+            d,
+            {
+                KEY_API_KEY: "sk-test",
+                KEY_USE_CUSTOM_SMOOTHER: True,
+                KEY_CUSTOM_SMOOTHER_SYSTEM: "System",
+                KEY_CUSTOM_SMOOTHER_USER: "User",
+                KEY_SMOOTHER_MODEL: "gpt-4o",
+            },
+        )
         loaded = load_settings(d)
         assert loaded.get(KEY_API_KEY) == "sk-test"
         assert loaded.get(KEY_USE_CUSTOM_SMOOTHER) is True
@@ -126,34 +155,50 @@ def test_settings_load_save():
         assert loaded2.get(KEY_SMOOTHER_MODEL) == DEFAULT_SMOOTHER_MODEL
     return True
 
+
 def test_smooth_transcription_uses_custom_prompts():
     """smooth_transcription mit custom_system/custom_user sendet diese ans Modell (Mock)."""
     from skill.text_smoothing import smooth_transcription
+
     sent = []
+
     class MockContent:
         def strip(self):
             return "ok"
+
     class Completions:
         def create(self, model=None, messages=None, temperature=None):
             sent.append(messages)
             msg = type("M", (), {"content": MockContent()})()
             choice = type("C", (), {"message": msg})()
             return type("R", (), {"choices": [choice]})()
+
     class Chat:
         completions = Completions()
+
     class MockClient:
         chat = Chat()
-    smooth_transcription(MockClient(), "hi", "de", custom_system="MySystem", custom_user="MyUser")
+
+    smooth_transcription(
+        MockClient(), "hi", "de", custom_system="MySystem", custom_user="MyUser"
+    )
     assert len(sent) == 1
-    assert any(m.get("role") == "system" and m.get("content") == "MySystem" for m in sent[0])
-    assert any(m.get("role") == "user" and "MyUser" in (m.get("content") or "") for m in sent[0])
+    assert any(
+        m.get("role") == "system" and m.get("content") == "MySystem" for m in sent[0]
+    )
+    assert any(
+        m.get("role") == "user" and "MyUser" in (m.get("content") or "")
+        for m in sent[0]
+    )
     return True
+
 
 def test_filter_hallucinations():
     """Halluzinationsfilter entfernt bekannte Phrasen."""
     if not HAS_SOUNDDEVICE:
         return "skip"
     from processing.transcription import _load_hallucinations, _filter_hallucinations
+
     path = os.path.join(APP_ROOT, "hallucination.json")
     assert os.path.isfile(path), "hallucination.json fehlt"
     hall = _load_hallucinations(path)
@@ -167,27 +212,33 @@ def test_filter_hallucinations():
         assert pattern not in out or out != text_with
     return True
 
+
 def test_ui_design_labels():
     """Design-Check ohne GUI: Labels Sprache/Glaetten und Fensterbreite (ui/constants.py, ohne CTk)."""
     p = os.path.join(APP_ROOT, "ui", "constants.py")
     spec = importlib.util.spec_from_file_location("ui_constants", p)
+    assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert mod.LABEL_SPRACHE == "Language", "Language label in UI"
     assert mod.LABEL_GLAETTEN == "Smooth", "Smooth label in UI"
-    assert mod.WINDOW_WIDTH == 420, "Window width for layout"
+    assert mod.WINDOW_WIDTH == 350, "Window width for layout"
     return True
+
 
 def test_ui_import_and_create_no_display():
     """UI-Modul importierbar; create_status_window mit Dummy-Callbacks; Design-Check: Sprache + Glätten erkennbar."""
     if not HAS_CTK:
         return "skip"
     from ui import create_status_window
+
     refs = {}
     callbacks = {
         "start_stop_toggle": lambda: None,
         "start_recording": lambda: None,
         "stop_recording": lambda: None,
+        "select_microphone": lambda _v: None,
+        "set_microphone_gain": lambda _v: None,
         "toggle_language": lambda: None,
         "toggle_keyboard": lambda: None,
         "quit_app": lambda: None,
@@ -197,14 +248,26 @@ def test_ui_import_and_create_no_display():
         "open_smoothing": lambda: None,
         "open_keys": lambda: None,
     }
-    hotkeys = {"start_stop": "ctrl+y", "toggle_language": "alt+l", "toggle_keyboard": "alt+m", "quit": "alt+q"}
-    initial = {"top_bar_compact": False, "transform_text_enabled": False, "current_language": "de"}
+    hotkeys = {
+        "start_stop": "ctrl+y",
+        "toggle_language": "alt+l",
+        "toggle_keyboard": "alt+m",
+        "quit": "alt+q",
+    }
+    initial = {
+        "top_bar_compact": False,
+        "transform_text_enabled": False,
+        "current_language": "de",
+        "microphone_names": ["Test Mic [0]"],
+        "microphone_gain": 1.0,
+    }
     win = create_status_window(callbacks, hotkeys, initial, refs)
     assert win is not None
     assert refs.get("window") is win
     assert refs.get("transform_text_var") is not None
     # Design: Sprache und Glätten im Interface (muss mit ui.constants uebereinstimmen)
     from ui.constants import LABEL_SPRACHE, LABEL_GLAETTEN
+
     lang_sw = refs.get("lang_switch")
     smooth_sw = refs.get("transform_switch")
     assert lang_sw is not None, "lang_switch in refs"
@@ -213,6 +276,7 @@ def test_ui_import_and_create_no_display():
     assert (smooth_sw.cget("text") or "").strip() == LABEL_GLAETTEN
     win.destroy()
     return True
+
 
 def run_all():
     cases = [
@@ -224,7 +288,10 @@ def run_all():
         ("processing record_audio (stop_event)", test_record_audio_stop_event),
         ("skill prompts de/en", test_prompts_de_en),
         ("skill smooth_transcription empty", test_smooth_transcription_empty),
-        ("skill smooth_transcription custom prompts", test_smooth_transcription_uses_custom_prompts),
+        (
+            "skill smooth_transcription custom prompts",
+            test_smooth_transcription_uses_custom_prompts,
+        ),
         ("transcription filter_hallucinations", test_filter_hallucinations),
         ("ui create_status_window", test_ui_import_and_create_no_display),
     ]
@@ -242,10 +309,25 @@ def run_all():
             print("[FAIL]", name, "-", e)
             failed.append((name, e))
     if failed:
-        print("\n", len(failed), "von", len(cases), "Tests fehlgeschlagen.", skipped, "uebersprungen.")
+        print(
+            "\n",
+            len(failed),
+            "von",
+            len(cases),
+            "Tests fehlgeschlagen.",
+            skipped,
+            "uebersprungen.",
+        )
         sys.exit(1)
-    print("\n", len(cases) - skipped, "Tests bestanden.", skipped, "uebersprungen (venv/uv fuer volle Suite).")
+    print(
+        "\n",
+        len(cases) - skipped,
+        "Tests bestanden.",
+        skipped,
+        "uebersprungen (venv/uv fuer volle Suite).",
+    )
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(run_all())
